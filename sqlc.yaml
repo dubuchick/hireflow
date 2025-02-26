@@ -1,0 +1,26 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "utilities/role/query.sql"
+    schema: "utilities/role/schema.sql"
+    gen:
+      go:
+        package: "roles"
+        out: "utilities/role"
+        sql_package: "pgx/v5"
+  - engine: "postgresql"
+    queries: "utilities/user/query.sql"
+    schema: "utilities/user/schema.sql"
+    gen:
+      go:
+        package: "users"
+        out: "utilities/user"
+        sql_package: "pgx/v5"
+  - engine: "postgresql"
+    queries: "utilities/self_assessment/query.sql"
+    schema: "utilities/self_assessment/schema.sql"
+    gen:
+      go:
+        package: "self_assessment"
+        out: "utilities/self_assessment"
+        sql_package: "pgx/v5"
