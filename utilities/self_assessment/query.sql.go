@@ -139,7 +139,6 @@ WHERE name = $1
 LIMIT 1
 `
 
-// Gets a category ID by its name
 func (q *Queries) GetCategoryIDByName(ctx context.Context, name pgtype.Text) (int32, error) {
 	row := q.db.QueryRow(ctx, getCategoryIDByName, name)
 	var id int32
@@ -426,6 +425,83 @@ func (q *Queries) InsertUserAnswer(ctx context.Context, arg InsertUserAnswerPara
 		arg.AnswerValue,
 	)
 	return err
+}
+
+const listCandidateScores = `-- name: ListCandidateScores :many
+WITH user_category_scores AS (
+  SELECT 
+    user_id,
+    session_id,
+    category_id,
+    score,
+    sac.name AS category_name
+  FROM 
+    user_assessment_scores uas
+  JOIN 
+    self_assessment_categories sac ON uas.category_id = sac.id
+),
+candidate_behavioral_scores AS (
+  SELECT 
+    user_id,
+    session_id,
+    category_id,
+    category_name,
+    score,
+    RANK() OVER (PARTITION BY user_id ORDER BY score DESC) as score_rank
+  FROM 
+    user_category_scores
+)
+
+SELECT 
+  user_id,
+  session_id,
+  category_name AS top_behavioral_trait,
+  score AS top_behavioral_score,
+  CASE 
+    WHEN COUNT(category_name) OVER (PARTITION BY user_id) > 0 
+    THEN 'In Progress'
+    ELSE 'Not Started'
+  END AS assessment_status
+FROM 
+  candidate_behavioral_scores
+WHERE 
+  score_rank = 1
+ORDER BY 
+  user_id
+`
+
+type ListCandidateScoresRow struct {
+	UserID             pgtype.Int4
+	SessionID          pgtype.Int4
+	TopBehavioralTrait pgtype.Text
+	TopBehavioralScore pgtype.Int4
+	AssessmentStatus   string
+}
+
+func (q *Queries) ListCandidateScores(ctx context.Context) ([]ListCandidateScoresRow, error) {
+	rows, err := q.db.Query(ctx, listCandidateScores)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCandidateScoresRow
+	for rows.Next() {
+		var i ListCandidateScoresRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.SessionID,
+			&i.TopBehavioralTrait,
+			&i.TopBehavioralScore,
+			&i.AssessmentStatus,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const mapQuestionToCategory = `-- name: MapQuestionToCategory :exec

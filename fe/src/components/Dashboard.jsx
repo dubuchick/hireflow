@@ -61,8 +61,6 @@ export const Header = ({ onLogout, user }) => {
           </Heading>
           <HStack as="nav" spacing={4} display={{ base: "none", md: "flex" }}>
             <Button variant="ghost">Dashboard</Button>
-            <Button variant="ghost">Assessments</Button>
-            <Button variant="ghost">Results</Button>
           </HStack>
         </HStack>
 

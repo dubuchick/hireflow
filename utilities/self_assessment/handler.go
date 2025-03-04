@@ -318,3 +318,13 @@ func (h *SelfAssessmentHandler) SetupBehavioralCategoriesAndMappings(c *gin.Cont
     
     c.JSON(http.StatusOK, response)
 }
+
+func (h *SelfAssessmentHandler) GetCandidateScores(c *gin.Context) {
+    candidates, err := h.queries.ListCandidateScores(c)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch candidate scores"})
+        return
+    }
+
+    c.JSON(http.StatusOK, candidates)
+}

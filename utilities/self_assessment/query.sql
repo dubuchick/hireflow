@@ -150,7 +150,48 @@ WHERE question = $1
 LIMIT 1;
 
 -- name: GetCategoryIDByName :one
-/* Gets a category ID by its name */
 SELECT id FROM self_assessment_categories 
 WHERE name = $1 
 LIMIT 1;
+
+-- name: ListCandidateScores :many
+WITH user_category_scores AS (
+  SELECT 
+    user_id,
+    session_id,
+    category_id,
+    score,
+    sac.name AS category_name
+  FROM 
+    user_assessment_scores uas
+  JOIN 
+    self_assessment_categories sac ON uas.category_id = sac.id
+),
+candidate_behavioral_scores AS (
+  SELECT 
+    user_id,
+    session_id,
+    category_id,
+    category_name,
+    score,
+    RANK() OVER (PARTITION BY user_id ORDER BY score DESC) as score_rank
+  FROM 
+    user_category_scores
+)
+
+SELECT 
+  user_id,
+  session_id,
+  category_name AS top_behavioral_trait,
+  score AS top_behavioral_score,
+  CASE 
+    WHEN COUNT(category_name) OVER (PARTITION BY user_id) > 0 
+    THEN 'In Progress'
+    ELSE 'Not Started'
+  END AS assessment_status
+FROM 
+  candidate_behavioral_scores
+WHERE 
+  score_rank = 1
+ORDER BY 
+  user_id;

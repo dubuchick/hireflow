@@ -9,6 +9,7 @@ import {
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./components/LoginPage";
 import Dashboard from "./components/Dashboard";
+import AdminDashboard from "./components/AdminDashboard";
 import BehavioralAssessment from "./components/BehavioralAssessment";
 // Import other assessment types as needed
 
@@ -43,9 +44,14 @@ const theme = extendTheme({
 });
 
 // Route guard component
-const ProtectedRoute = ({ user, children }) => {
+const ProtectedRoute = ({ user, children, requiredRole }) => {
   if (!user?.isLoggedIn) {
     return <Navigate to="/login" replace />;
+  }
+  
+  // If a requiredRole is specified, check against user's role
+  if (requiredRole && user.role_id !== requiredRole) {
+    return <Navigate to="/dashboard" replace />;
   }
   
   return children;
@@ -60,15 +66,15 @@ const App = () => {
     const checkAuth = () => {
       const token = localStorage.getItem('token');
       const roleId = localStorage.getItem('role_id');
-      
       console.log("Token in storage:", token);
       if (token && roleId) {
-        setUser({ isLoggedIn: true, role_id: parseInt(roleId) });
+        setUser({ 
+          isLoggedIn: true, 
+          role_id: parseInt(roleId) 
+        });
       }
-      
       setIsLoading(false);
     };
-
     checkAuth();
   }, []);
 
@@ -104,39 +110,39 @@ const App = () => {
       <CSSReset />
       <Router>
         <Routes>
-          <Route 
-            path="/login" 
+          <Route
+            path="/login"
             element={
               user?.isLoggedIn ? 
-                <Navigate to="/dashboard" replace /> : 
-                <LoginPage onLoginSuccess={handleLoginSuccess} />
-            } 
+              <Navigate to="/dashboard" replace /> : 
+              <LoginPage onLoginSuccess={handleLoginSuccess} />
+            }
           />
-          
-          <Route 
-            path="/dashboard" 
+          <Route
+            path="/dashboard"
             element={
               <ProtectedRoute user={user}>
-                <Dashboard user={user} onLogout={handleLogout} />
+                {user?.role_id === 1 ? (
+                  <AdminDashboard user={user} onLogout={handleLogout} />
+                ) : (
+                  <Dashboard user={user} onLogout={handleLogout} />
+                )}
               </ProtectedRoute>
-            } 
+            }
           />
-          
-          <Route 
-            path="/assessment/behavioral" 
+          <Route
+            path="/assessment/behavioral"
             element={
               <ProtectedRoute user={user}>
-                <BehavioralAssessment 
-                  user={user} 
-                  onLogout={handleLogout} 
+                <BehavioralAssessment
+                  user={user}
+                  onLogout={handleLogout}
                   onComplete={handleAssessmentComplete}
                 />
               </ProtectedRoute>
-            } 
+            }
           />
-          
           {/* Add routes for other assessment types as needed */}
-          
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Router>
