@@ -2,6 +2,7 @@ package self_assessment
 
 import (
 	"backend/app/middleware"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,5 +17,13 @@ func SetupRoutesSelfAssessment(r *gin.Engine, selfAssessmentHandler *SelfAssessm
 	auth.GET("/status", selfAssessmentHandler.GetUserAssessmentStatus)
 	auth.PUT("/mapping", selfAssessmentHandler.SetupBehavioralCategoriesAndMappings)
 	auth.GET("/candidate/scores", selfAssessmentHandler.GetCandidateScores)
-	auth.POST("/submit/personality", selfAssessmentHandler.SubmitPersonalityAssessment)
+
+	// Add new unified route
+	auth.POST("/submit/:type", selfAssessmentHandler.SubmitAssessment)
+	
+	// Add route to get session scores
+	auth.POST("/session/scores", selfAssessmentHandler.GetSessionScores)
+
+	// Add the new route for candidate assessment details
+    auth.POST("/candidate/details", selfAssessmentHandler.GetCandidateAssessmentDetails)
 }

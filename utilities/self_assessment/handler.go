@@ -250,186 +250,281 @@ func (h *SelfAssessmentHandler) GetUserAssessmentStatus(c *gin.Context) {
 
 // SetupBehavioralCategoriesAndMappings sets up categories and maps questions to them
 func (h *SelfAssessmentHandler) SetupBehavioralCategoriesAndMappings(c *gin.Context) {
-    mappings := map[string]string{
-        // Adaptability Category
-        "I remain calm and focused under pressure":           "Adaptability",
-        "I am comfortable adapting to unexpected changes":    "Adaptability",
-        "I remain positive even when facing challenges":      "Adaptability",
-        
-        // Communication Category
-        "I carefully listen to others before responding":     "Communication",
-        "I communicate my ideas clearly and effectively":     "Communication",
-        "I make an effort to understand different perspectives": "Communication",
-        
-        // Leadership Category
-        "I proactively take the lead when working on projects": "Leadership",
-        "When facing a conflict, I try to resolve it diplomatically": "Leadership",
-        "I can effectively multitask and handle multiple priorities": "Leadership",
-        
-        // Teamwork Category
-        "I prefer working in a team rather than alone":        "Teamwork",
-        "I encourage and support my colleagues in the workplace": "Teamwork",
-        "I am open to constructive criticism and feedback":    "Teamwork",
-        
-        // Work Ethic Category
-        "I always meet deadlines and manage my time effectively": "Work Ethic",
-        "I take responsibility for my mistakes and learn from them": "Work Ethic",
-        "I follow company policies and ethical guidelines strictly": "Work Ethic",
-    }
-    
-    // Track successful and failed mappings
-    successCount := 0
-    failedMappings := []string{}
-    
-    // Apply each mapping
-    for questionText, categoryName := range mappings {
-        // Get question ID
-        questionID, err := h.queries.GetQuestionIDByText(c, questionText)
-        if err != nil {
-            failedMappings = append(failedMappings, fmt.Sprintf("Question not found: %s", questionText))
-            continue
-        }
-        
-		// Get category ID - convert to pgtype.Text
-        categoryNameParam := pgtype.Text{
-            String: categoryName,
-            Valid:  true,
-        }
+	mappings := map[string]string{
+		// Adaptability Category
+		"I remain calm and focused under pressure":        "Adaptability",
+		"I am comfortable adapting to unexpected changes": "Adaptability",
+		"I remain positive even when facing challenges":   "Adaptability",
 
-        // Get category ID
-        categoryID, err := h.queries.GetCategoryIDByName(c, categoryNameParam)
-        if err != nil {
-            failedMappings = append(failedMappings, fmt.Sprintf("Category not found: %s", categoryName))
-            continue
-        }
-        
-        // Map question to category
-        err = h.queries.MapQuestionToCategory(c, MapQuestionToCategoryParams{
-            QuestionID: questionID,
-            CategoryID: categoryID,
-        })
-        
-        if err != nil {
-            failedMappings = append(failedMappings, fmt.Sprintf("Failed to map '%s' to '%s': %v", questionText, categoryName, err))
-        } else {
-            successCount++
-        }
-    }
-    
-    response := gin.H{
-        "message": "Behavioral categories and mappings setup completed",
-        "mappings_succeeded": successCount,
-        "mappings_total": len(mappings),
-    }
-    
-    if len(failedMappings) > 0 {
-        response["failed_mappings"] = failedMappings
-    }
-    
-    c.JSON(http.StatusOK, response)
+		// Communication Category
+		"I carefully listen to others before responding":        "Communication",
+		"I communicate my ideas clearly and effectively":        "Communication",
+		"I make an effort to understand different perspectives": "Communication",
+
+		// Leadership Category
+		"I proactively take the lead when working on projects":       "Leadership",
+		"When facing a conflict, I try to resolve it diplomatically": "Leadership",
+		"I can effectively multitask and handle multiple priorities": "Leadership",
+
+		// Teamwork Category
+		"I prefer working in a team rather than alone":           "Teamwork",
+		"I encourage and support my colleagues in the workplace": "Teamwork",
+		"I am open to constructive criticism and feedback":       "Teamwork",
+
+		// Work Ethic Category
+		"I always meet deadlines and manage my time effectively":    "Work Ethic",
+		"I take responsibility for my mistakes and learn from them": "Work Ethic",
+		"I follow company policies and ethical guidelines strictly": "Work Ethic",
+	}
+
+	// Track successful and failed mappings
+	successCount := 0
+	failedMappings := []string{}
+
+	// Apply each mapping
+	for questionText, categoryName := range mappings {
+		// Get question ID
+		questionID, err := h.queries.GetQuestionIDByText(c, questionText)
+		if err != nil {
+			failedMappings = append(failedMappings, fmt.Sprintf("Question not found: %s", questionText))
+			continue
+		}
+
+		// Get category ID - convert to pgtype.Text
+		categoryNameParam := pgtype.Text{
+			String: categoryName,
+			Valid:  true,
+		}
+
+		// Get category ID
+		categoryID, err := h.queries.GetCategoryIDByName(c, categoryNameParam)
+		if err != nil {
+			failedMappings = append(failedMappings, fmt.Sprintf("Category not found: %s", categoryName))
+			continue
+		}
+
+		// Map question to category
+		err = h.queries.MapQuestionToCategory(c, MapQuestionToCategoryParams{
+			QuestionID: questionID,
+			CategoryID: categoryID,
+		})
+
+		if err != nil {
+			failedMappings = append(failedMappings, fmt.Sprintf("Failed to map '%s' to '%s': %v", questionText, categoryName, err))
+		} else {
+			successCount++
+		}
+	}
+
+	response := gin.H{
+		"message":            "Behavioral categories and mappings setup completed",
+		"mappings_succeeded": successCount,
+		"mappings_total":     len(mappings),
+	}
+
+	if len(failedMappings) > 0 {
+		response["failed_mappings"] = failedMappings
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 func (h *SelfAssessmentHandler) GetCandidateScores(c *gin.Context) {
-    candidates, err := h.queries.ListCandidateScores(c)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch candidate scores"})
-        return
-    }
+	candidates, err := h.queries.ListCandidateScores(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch candidate scores"})
+		return
+	}
 
-    c.JSON(http.StatusOK, candidates)
+	c.JSON(http.StatusOK, candidates)
 }
 
-func (h *SelfAssessmentHandler) SubmitPersonalityAssessment(c *gin.Context) {
+// SubmitAssessment is a unified handler for all assessment types
+func (h *SelfAssessmentHandler) SubmitAssessment(c *gin.Context) {
+	// Get assessment type from path parameter
+	assessmentType := c.Param("type")
+	if assessmentType == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Assessment type is required"})
+		return
+	}
+
+	// Validate assessment type
+	if assessmentType != "behavioral" && assessmentType != "personality" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid assessment type"})
+		return
+	}
+
+	// Parse request
+	var req struct {
+		UserID  int32 `json:"user_id" binding:"required"`
+		Answers []struct {
+			QuestionID  int32  `json:"question_id" binding:"required"`
+			AnswerValue string `json:"answer_value" binding:"required"`
+		} `json:"answers" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Create a new assessment session
+	session, err := h.queries.CreateAssessmentSession(c, CreateAssessmentSessionParams{
+		UserID:         req.UserID,
+		AssessmentType: assessmentType,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create session"})
+		return
+	}
+	sessionID := session.ID
+
+	// Insert each answer
+	for _, answer := range req.Answers {
+		// Determine points based on answer value
+		var points int = 0
+		// Try to convert directly to a number
+		if p, err := strconv.Atoi(answer.AnswerValue); err == nil {
+			points = p
+		} else {
+			// Default points based on standard options
+			switch answer.AnswerValue {
+			case "1":
+				points = 1
+			case "2":
+				points = 2
+			case "3":
+				points = 3
+			case "4":
+				points = 4
+			default:
+				points = 2 // Default to middle value
+			}
+		}
+
+		// Create answer JSONB structure
+		answerJSON := map[string]interface{}{
+			"selected": answer.AnswerValue,
+			"points":   points,
+		}
+
+		// Convert to JSON
+		answerBytes, err := json.Marshal(answerJSON)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process answer"})
+			return
+		}
+
+		// Store the answer
+		err = h.queries.InsertUserAnswer(c, InsertUserAnswerParams{
+			UserID:      pgtype.Int4{Int32: req.UserID, Valid: true},
+			SessionID:   pgtype.Int4{Int32: sessionID, Valid: true},
+			QuestionID:  pgtype.Int4{Int32: answer.QuestionID, Valid: true},
+			AnswerValue: answerBytes,
+		})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to insert answer: %v", err)})
+			return
+		}
+	}
+
+	// Calculate scores based on assessment type
+	var calcErr error
+	switch assessmentType {
+	case "behavioral":
+		calcErr = h.queries.CalculateBehavioralScores(c, pgtype.Int4{Int32: sessionID, Valid: true})
+	case "personality":
+		calcErr = h.queries.CalculatePersonalityScores(c, pgtype.Int4{Int32: sessionID, Valid: true})
+	}
+
+	if calcErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to calculate scores: %v", calcErr)})
+		return
+	}
+
+	// Mark session as completed
+	err = h.queries.CompleteAssessmentSession(c, sessionID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to complete session: %v", err)})
+		return
+	}
+
+	scores, err := h.queries.GetSessionScores(c, pgtype.Int4{Int32: sessionID, Valid: true})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve scores"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":    fmt.Sprintf("%s assessment completed successfully", assessmentType),
+		"session_id": sessionID,
+		"scores":     scores,
+	})
+}
+
+// SubmitBehavioralAssessment - wrapper for backward compatibility
+func (h *SelfAssessmentHandler) SubmitBehavioralAssessment(c *gin.Context) {
+	c.Params = append(c.Params, gin.Param{Key: "type", Value: "behavioral"})
+	h.SubmitAssessment(c)
+}
+
+// GetSessionScores returns scores for a specific session
+func (h *SelfAssessmentHandler) GetSessionScores(c *gin.Context) {
+	var req struct {
+		SessionID int32 `json:"session_id" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Session ID is required"})
+		return
+	}
+
+	scores, err := h.queries.GetSessionScores(c, pgtype.Int4{Int32: req.SessionID, Valid: true})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve scores"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"session_id": req.SessionID,
+		"scores":     scores,
+	})
+}
+
+func (h *SelfAssessmentHandler) GetCandidateAssessmentDetails(c *gin.Context) {
     var req struct {
-        UserID  int32 `json:"user_id" binding:"required"`
-        Answers []struct {
-            QuestionID   int32  `json:"question_id" binding:"required"`
-            AnswerValue  string `json:"answer_value" binding:"required"`
-        } `json:"answers" binding:"required"`
+        UserID int32 `json:"user_id" binding:"required"`
+        AssessmentType string `json:"assessment_type" binding:"required"`
     }
     
     if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        c.JSON(http.StatusBadRequest, gin.H{"error": "User ID and assessment type required"})
         return
     }
-
-    // Create a new assessment session
-    session, err := h.queries.CreateAssessmentSession(c, CreateAssessmentSessionParams{
-        UserID:          req.UserID,
-        AssessmentType:  "personality",
-    })
+    
+    // Create the params struct according to your SQLC-generated type
+    params := GetCandidateAssessmentResultsParams{
+        UserID: pgtype.Int4{Int32: req.UserID, Valid: true},
+        AssessmentType: req.AssessmentType,
+    }
+    
+    results, err := h.queries.GetCandidateAssessmentResults(c, params)
     if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create session"})
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve assessment details"})
         return
     }
-    sessionID := session.ID
-
-    // Insert each answer
-    for _, answer := range req.Answers {
-        // Determine points based on answer value
-        var points int = 0
-        
-        // Try to convert directly to a number
-        if p, err := strconv.Atoi(answer.AnswerValue); err == nil {
-            points = p
-        } else {
-            // Default points based on standard options
-            switch answer.AnswerValue {
-            case "1":
-                points = 1
-            case "2":
-                points = 2
-            case "3":
-                points = 3
-            case "4":
-                points = 4
-            default:
-                points = 2 // Default to middle value
-            }
-        }
-
-        // Create answer JSONB structure
-        answerJSON := map[string]interface{}{
-            "selected": answer.AnswerValue,
-            "points":   points,
-        }
-
-        // Convert to JSON
-        answerBytes, err := json.Marshal(answerJSON)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process answer"})
-            return
-        }
-
-        // Store the answer
-        err = h.queries.InsertUserAnswer(c, InsertUserAnswerParams{
-            UserID:       pgtype.Int4{Int32: req.UserID, Valid: true},
-            SessionID:    pgtype.Int4{Int32: sessionID, Valid: true},
-            QuestionID:   pgtype.Int4{Int32: answer.QuestionID, Valid: true},
-            AnswerValue:  answerBytes,
-        })
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to insert answer: %v", err)})
-            return
-        }
+    
+    // Get the latest session if multiple exist
+    var latestSessionID int32
+    if len(results) > 0 {
+        // Extract the Int32 value from the pgtype.Int4 field
+        latestSessionID = results[0].SessionID.Int32
     }
-
-    // Calculate personality category scores
-    err = h.queries.CalculatePersonalityScores(c, pgtype.Int4{Int32: sessionID, Valid: true})
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to calculate scores: %v", err)})
-        return
-    }
-
-    // Mark session as completed
-    err = h.queries.CompleteAssessmentSession(c, sessionID)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to complete session: %v", err)})
-        return
-    }
-
+    
     c.JSON(http.StatusOK, gin.H{
-        "message":     "Personality assessment completed successfully",
-        "session_id":  sessionID,
+        "user_id": req.UserID,
+        "assessment_type": req.AssessmentType,
+        "session_id": latestSessionID,
+        "results": results,
     })
 }

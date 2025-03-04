@@ -54,3 +54,13 @@ CREATE TABLE IF NOT EXISTS user_assessment_scores(
     constraint fk_session_score foreign key (session_id) REFERENCES user_assessment_session(id) on delete SET NULL,
     constraint fk_category_score foreign key (category_id) REFERENCES self_assessment_categories(id) on delete SET NULL
 );
+
+CREATE TABLE IF NOT EXISTS users(
+    id SERIAL PRIMARY KEY,
+    role_id integer null,
+    name varchar(100) NOT NULL,
+    email varchar(100) NOT NULL,
+    password varchar(100) NOT NULL,
+    created_at timestamp default now(),
+    constraint fk_role foreign key (role_id) REFERENCES roles(id) on delete SET NULL
+);

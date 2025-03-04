@@ -50,11 +50,6 @@ INSERT INTO user_answers (
     $1, $2, $3, $4
 ) RETURNING *;
 
--- name: CompleteAssessmentSession :exec
-UPDATE user_assessment_sessions
-SET completed_at = NOW()
-WHERE id = $1;
-
 -- name: GetUserAssessmentSessions :many
 SELECT * FROM user_assessment_sessions
 where user_id = $1 ORDER BY started_at DESC;
@@ -200,48 +195,161 @@ WHERE
 ORDER BY 
   user_id;
 
--- name: CalculatePersonalityScores :exec
-WITH answer_points AS (
-  SELECT
-    ua.user_id,
-    ua.session_id,
-    sam.category_id,
-    sam.points
-  FROM
-    user_answers ua
-  JOIN
-    self_assessment_mappings sam ON
-    ua.question_id = sam.question_id AND
-    (ua.answer_value->>'selected')::int = sam.answer_value
-  WHERE
-    ua.session_id = $1
-),
-category_scores AS (
-  SELECT
-    ap.user_id,
-    ap.session_id,
-    ap.category_id,
-    sac.name AS category_name,
-    ROUND(AVG(ap.points)::numeric, 2) AS avg_score,
-    SUM(ap.points) AS total_points,
-    COUNT(ap.points) AS question_count
-  FROM
-    answer_points ap
-  JOIN
-    self_assessment_categories sac ON ap.category_id = sac.id
-  GROUP BY
-    ap.user_id, ap.session_id, ap.category_id, sac.name
+
+-- name: GetAssessmentType :one
+-- Get the assessment type for a given session
+SELECT assessment_type 
+FROM user_assessment_sessions
+WHERE id = $1;
+
+-- name: ClearSessionScores :exec
+-- Clear any existing scores for a specific session
+DELETE FROM user_assessment_scores
+WHERE session_id = $1;
+
+-- name: CompleteAssessmentSession :exec
+-- Mark a session as completed
+UPDATE user_assessment_sessions
+SET completed_at = CURRENT_TIMESTAMP
+WHERE id = $1 AND completed_at IS NULL;
+
+-- name: CalculateBehavioralScores :exec
+-- Calculate scores for behavioral assessment type
+WITH answers AS (
+  SELECT 
+    ua.session_id, 
+    ua.question_id,
+    (ua.answer_value->>'points')::int as points,
+    sam.category_id
+  FROM user_answers ua
+  JOIN self_assessment_mappings sam ON 
+    sam.question_id = ua.question_id AND 
+    sam.answer_value = (ua.answer_value->>'selected')::int
+  JOIN user_assessment_sessions uas ON 
+    uas.id = ua.session_id
+  WHERE 
+    ua.session_id = $1 AND
+    uas.assessment_type = 'behavioral'
 )
--- Insert category scores
 INSERT INTO user_assessment_scores (
   user_id,
   session_id,
   category_id,
   score
 )
-SELECT
+SELECT 
+  (SELECT user_id FROM user_assessment_sessions WHERE id = $1),
+  $1,
+  a.category_id,
+  SUM(a.points)
+FROM answers a
+GROUP BY a.category_id;
+
+-- name: CalculatePersonalityScores :exec
+-- Calculate scores for personality assessment type
+WITH answers AS (
+  SELECT 
+    ua.session_id, 
+    ua.question_id,
+    (ua.answer_value->>'points')::int as points,
+    sam.category_id
+  FROM user_answers ua
+  JOIN self_assessment_mappings sam ON 
+    sam.question_id = ua.question_id AND 
+    sam.answer_value = (ua.answer_value->>'selected')::int
+  JOIN user_assessment_sessions uas ON 
+    uas.id = ua.session_id
+  WHERE 
+    ua.session_id = $1 AND
+    uas.assessment_type = 'personality'
+)
+INSERT INTO user_assessment_scores (
   user_id,
   session_id,
   category_id,
-  avg_score
-FROM category_scores;
+  score
+)
+SELECT 
+  (SELECT user_id FROM user_assessment_sessions WHERE id = $1),
+  $1,
+  a.category_id,
+  SUM(a.points)
+FROM answers a
+GROUP BY a.category_id;
+
+-- name: CalculateCognitiveScores :exec
+-- Calculate scores for cognitive assessment type
+WITH answers AS (
+  SELECT 
+    ua.session_id, 
+    ua.question_id,
+    (ua.answer_value->>'points')::int as points,
+    sam.category_id
+  FROM user_answers ua
+  JOIN self_assessment_mappings sam ON 
+    sam.question_id = ua.question_id AND 
+    -- Cognitive assessments may have different answer mapping
+    sam.answer_value = (ua.answer_value->>'selected')
+  JOIN user_assessment_sessions uas ON 
+    uas.id = ua.session_id
+  WHERE 
+    ua.session_id = $1 AND
+    uas.assessment_type = 'cognitive'
+)
+INSERT INTO user_assessment_scores (
+  user_id,
+  session_id,
+  category_id,
+  score
+)
+SELECT 
+  (SELECT user_id FROM user_assessment_sessions WHERE id = $1),
+  $1,
+  a.category_id,
+  SUM(a.points)
+FROM answers a
+GROUP BY a.category_id;
+
+-- name: GetSessionScores :many
+-- Get all scores for a specific session with category details
+SELECT 
+  uas.*,
+  sac.name as category_name,
+  sac.description as category_description
+FROM user_assessment_scores uas
+JOIN self_assessment_categories sac ON uas.category_id = sac.id
+WHERE uas.session_id = $1;
+
+-- name: GetUserScores :many
+-- Get all scores for a specific user with session and category details
+SELECT 
+  uas.*,
+  uass.assessment_type,
+  uass.started_at,
+  uass.completed_at,
+  sac.name as category_name,
+  sac.description as category_description
+FROM user_assessment_scores uas
+JOIN user_assessment_sessions uass ON uas.session_id = uass.id
+JOIN self_assessment_categories sac ON uas.category_id = sac.id
+WHERE uas.user_id = $1
+ORDER BY uass.completed_at DESC;
+
+-- name: GetCandidateAssessmentResults :many
+SELECT 
+  uas.id,
+  uas.user_id,
+  uas.session_id,
+  uas.category_id,
+  uas.score,
+  sac.name as category_name,
+  sac.description as category_description,
+  sess.started_at as assessment_date,
+  sess.assessment_type
+FROM user_assessment_scores uas
+JOIN self_assessment_categories sac ON uas.category_id = sac.id
+JOIN user_assessment_sessions sess ON uas.session_id = sess.id
+WHERE 
+  uas.user_id = $1 AND
+  sess.assessment_type = $2
+ORDER BY sac.name;

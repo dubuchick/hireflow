@@ -11,6 +11,44 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const calculateBehavioralScores = `-- name: CalculateBehavioralScores :exec
+WITH answers AS (
+  SELECT 
+    ua.session_id, 
+    ua.question_id,
+    (ua.answer_value->>'points')::int as points,
+    sam.category_id
+  FROM user_answers ua
+  JOIN self_assessment_mappings sam ON 
+    sam.question_id = ua.question_id AND 
+    sam.answer_value = (ua.answer_value->>'selected')::int
+  JOIN user_assessment_sessions uas ON 
+    uas.id = ua.session_id
+  WHERE 
+    ua.session_id = $1 AND
+    uas.assessment_type = 'behavioral'
+)
+INSERT INTO user_assessment_scores (
+  user_id,
+  session_id,
+  category_id,
+  score
+)
+SELECT 
+  (SELECT user_id FROM user_assessment_sessions WHERE id = $1),
+  $1,
+  a.category_id,
+  SUM(a.points)
+FROM answers a
+GROUP BY a.category_id
+`
+
+// Calculate scores for behavioral assessment type
+func (q *Queries) CalculateBehavioralScores(ctx context.Context, sessionID pgtype.Int4) error {
+	_, err := q.db.Exec(ctx, calculateBehavioralScores, sessionID)
+	return err
+}
+
 const calculateCategoryScores = `-- name: CalculateCategoryScores :exec
 WITH answer_points AS (
 SELECT
@@ -63,37 +101,23 @@ func (q *Queries) CalculateCategoryScores(ctx context.Context, sessionID pgtype.
 	return err
 }
 
-const calculatePersonalityScores = `-- name: CalculatePersonalityScores :exec
-WITH answer_points AS (
-  SELECT
-    ua.user_id,
-    ua.session_id,
-    sam.category_id,
-    sam.points
-  FROM
-    user_answers ua
-  JOIN
-    self_assessment_mappings sam ON
-    ua.question_id = sam.question_id AND
-    (ua.answer_value->>'selected')::int = sam.answer_value
-  WHERE
-    ua.session_id = $1
-),
-category_scores AS (
-  SELECT
-    ap.user_id,
-    ap.session_id,
-    ap.category_id,
-    sac.name AS category_name,
-    ROUND(AVG(ap.points)::numeric, 2) AS avg_score,
-    SUM(ap.points) AS total_points,
-    COUNT(ap.points) AS question_count
-  FROM
-    answer_points ap
-  JOIN
-    self_assessment_categories sac ON ap.category_id = sac.id
-  GROUP BY
-    ap.user_id, ap.session_id, ap.category_id, sac.name
+const calculateCognitiveScores = `-- name: CalculateCognitiveScores :exec
+WITH answers AS (
+  SELECT 
+    ua.session_id, 
+    ua.question_id,
+    (ua.answer_value->>'points')::int as points,
+    sam.category_id
+  FROM user_answers ua
+  JOIN self_assessment_mappings sam ON 
+    sam.question_id = ua.question_id AND 
+    -- Cognitive assessments may have different answer mapping
+    sam.answer_value = (ua.answer_value->>'selected')
+  JOIN user_assessment_sessions uas ON 
+    uas.id = ua.session_id
+  WHERE 
+    ua.session_id = $1 AND
+    uas.assessment_type = 'cognitive'
 )
 INSERT INTO user_assessment_scores (
   user_id,
@@ -101,26 +125,77 @@ INSERT INTO user_assessment_scores (
   category_id,
   score
 )
-SELECT
+SELECT 
+  (SELECT user_id FROM user_assessment_sessions WHERE id = $1),
+  $1,
+  a.category_id,
+  SUM(a.points)
+FROM answers a
+GROUP BY a.category_id
+`
+
+// Calculate scores for cognitive assessment type
+func (q *Queries) CalculateCognitiveScores(ctx context.Context, sessionID pgtype.Int4) error {
+	_, err := q.db.Exec(ctx, calculateCognitiveScores, sessionID)
+	return err
+}
+
+const calculatePersonalityScores = `-- name: CalculatePersonalityScores :exec
+WITH answers AS (
+  SELECT 
+    ua.session_id, 
+    ua.question_id,
+    (ua.answer_value->>'points')::int as points,
+    sam.category_id
+  FROM user_answers ua
+  JOIN self_assessment_mappings sam ON 
+    sam.question_id = ua.question_id AND 
+    sam.answer_value = (ua.answer_value->>'selected')::int
+  JOIN user_assessment_sessions uas ON 
+    uas.id = ua.session_id
+  WHERE 
+    ua.session_id = $1 AND
+    uas.assessment_type = 'personality'
+)
+INSERT INTO user_assessment_scores (
   user_id,
   session_id,
   category_id,
-  avg_score
-FROM category_scores
+  score
+)
+SELECT 
+  (SELECT user_id FROM user_assessment_sessions WHERE id = $1),
+  $1,
+  a.category_id,
+  SUM(a.points)
+FROM answers a
+GROUP BY a.category_id
 `
 
-// Insert category scores
+// Calculate scores for personality assessment type
 func (q *Queries) CalculatePersonalityScores(ctx context.Context, sessionID pgtype.Int4) error {
 	_, err := q.db.Exec(ctx, calculatePersonalityScores, sessionID)
 	return err
 }
 
-const completeAssessmentSession = `-- name: CompleteAssessmentSession :exec
-UPDATE user_assessment_sessions
-SET completed_at = NOW()
-WHERE id = $1
+const clearSessionScores = `-- name: ClearSessionScores :exec
+DELETE FROM user_assessment_scores
+WHERE session_id = $1
 `
 
+// Clear any existing scores for a specific session
+func (q *Queries) ClearSessionScores(ctx context.Context, sessionID pgtype.Int4) error {
+	_, err := q.db.Exec(ctx, clearSessionScores, sessionID)
+	return err
+}
+
+const completeAssessmentSession = `-- name: CompleteAssessmentSession :exec
+UPDATE user_assessment_sessions
+SET completed_at = CURRENT_TIMESTAMP
+WHERE id = $1 AND completed_at IS NULL
+`
+
+// Mark a session as completed
 func (q *Queries) CompleteAssessmentSession(ctx context.Context, id int32) error {
 	_, err := q.db.Exec(ctx, completeAssessmentSession, id)
 	return err
@@ -217,6 +292,87 @@ func (q *Queries) GetAssessmentQuestionPersonality(ctx context.Context) ([]SelfA
 	return items, nil
 }
 
+const getAssessmentType = `-- name: GetAssessmentType :one
+SELECT assessment_type 
+FROM user_assessment_sessions
+WHERE id = $1
+`
+
+// Get the assessment type for a given session
+func (q *Queries) GetAssessmentType(ctx context.Context, id int32) (string, error) {
+	row := q.db.QueryRow(ctx, getAssessmentType, id)
+	var assessment_type string
+	err := row.Scan(&assessment_type)
+	return assessment_type, err
+}
+
+const getCandidateAssessmentResults = `-- name: GetCandidateAssessmentResults :many
+SELECT 
+  uas.id,
+  uas.user_id,
+  uas.session_id,
+  uas.category_id,
+  uas.score,
+  sac.name as category_name,
+  sac.description as category_description,
+  sess.started_at as assessment_date,
+  sess.assessment_type
+FROM user_assessment_scores uas
+JOIN self_assessment_categories sac ON uas.category_id = sac.id
+JOIN user_assessment_sessions sess ON uas.session_id = sess.id
+WHERE 
+  uas.user_id = $1 AND
+  sess.assessment_type = $2
+ORDER BY sac.name
+`
+
+type GetCandidateAssessmentResultsParams struct {
+	UserID         pgtype.Int4
+	AssessmentType string
+}
+
+type GetCandidateAssessmentResultsRow struct {
+	ID                  int32
+	UserID              pgtype.Int4
+	SessionID           pgtype.Int4
+	CategoryID          pgtype.Int4
+	Score               pgtype.Int4
+	CategoryName        pgtype.Text
+	CategoryDescription pgtype.Text
+	AssessmentDate      pgtype.Timestamp
+	AssessmentType      string
+}
+
+func (q *Queries) GetCandidateAssessmentResults(ctx context.Context, arg GetCandidateAssessmentResultsParams) ([]GetCandidateAssessmentResultsRow, error) {
+	rows, err := q.db.Query(ctx, getCandidateAssessmentResults, arg.UserID, arg.AssessmentType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetCandidateAssessmentResultsRow
+	for rows.Next() {
+		var i GetCandidateAssessmentResultsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.SessionID,
+			&i.CategoryID,
+			&i.Score,
+			&i.CategoryName,
+			&i.CategoryDescription,
+			&i.AssessmentDate,
+			&i.AssessmentType,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getCategoryIDByName = `-- name: GetCategoryIDByName :one
 SELECT id FROM self_assessment_categories 
 WHERE name = $1 
@@ -242,6 +398,55 @@ func (q *Queries) GetQuestionIDByText(ctx context.Context, question string) (int
 	var id int32
 	err := row.Scan(&id)
 	return id, err
+}
+
+const getSessionScores = `-- name: GetSessionScores :many
+SELECT 
+  uas.id, uas.user_id, uas.session_id, uas.category_id, uas.score,
+  sac.name as category_name,
+  sac.description as category_description
+FROM user_assessment_scores uas
+JOIN self_assessment_categories sac ON uas.category_id = sac.id
+WHERE uas.session_id = $1
+`
+
+type GetSessionScoresRow struct {
+	ID                  int32
+	UserID              pgtype.Int4
+	SessionID           pgtype.Int4
+	CategoryID          pgtype.Int4
+	Score               pgtype.Int4
+	CategoryName        pgtype.Text
+	CategoryDescription pgtype.Text
+}
+
+// Get all scores for a specific session with category details
+func (q *Queries) GetSessionScores(ctx context.Context, sessionID pgtype.Int4) ([]GetSessionScoresRow, error) {
+	rows, err := q.db.Query(ctx, getSessionScores, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetSessionScoresRow
+	for rows.Next() {
+		var i GetSessionScoresRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.SessionID,
+			&i.CategoryID,
+			&i.Score,
+			&i.CategoryName,
+			&i.CategoryDescription,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getUserAnswerBySession = `-- name: GetUserAnswerBySession :many
@@ -373,6 +578,66 @@ func (q *Queries) GetUserCompletedAssessments(ctx context.Context, userID int32)
 	for rows.Next() {
 		var i GetUserCompletedAssessmentsRow
 		if err := rows.Scan(&i.AssessmentType, &i.CompletedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUserScores = `-- name: GetUserScores :many
+SELECT 
+  uas.id, uas.user_id, uas.session_id, uas.category_id, uas.score,
+  uass.assessment_type,
+  uass.started_at,
+  uass.completed_at,
+  sac.name as category_name,
+  sac.description as category_description
+FROM user_assessment_scores uas
+JOIN user_assessment_sessions uass ON uas.session_id = uass.id
+JOIN self_assessment_categories sac ON uas.category_id = sac.id
+WHERE uas.user_id = $1
+ORDER BY uass.completed_at DESC
+`
+
+type GetUserScoresRow struct {
+	ID                  int32
+	UserID              pgtype.Int4
+	SessionID           pgtype.Int4
+	CategoryID          pgtype.Int4
+	Score               pgtype.Int4
+	AssessmentType      string
+	StartedAt           pgtype.Timestamp
+	CompletedAt         pgtype.Timestamp
+	CategoryName        pgtype.Text
+	CategoryDescription pgtype.Text
+}
+
+// Get all scores for a specific user with session and category details
+func (q *Queries) GetUserScores(ctx context.Context, userID pgtype.Int4) ([]GetUserScoresRow, error) {
+	rows, err := q.db.Query(ctx, getUserScores, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetUserScoresRow
+	for rows.Next() {
+		var i GetUserScoresRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.SessionID,
+			&i.CategoryID,
+			&i.Score,
+			&i.AssessmentType,
+			&i.StartedAt,
+			&i.CompletedAt,
+			&i.CategoryName,
+			&i.CategoryDescription,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
