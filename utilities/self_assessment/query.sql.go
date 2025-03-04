@@ -11,27 +11,55 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const calculateUserScores = `-- name: CalculateUserScores :exec
-INSERT INTO user_assessment_scores (user_id, session_id, category_id, score)
+const calculateCategoryScores = `-- name: CalculateCategoryScores :exec
+WITH answer_points AS (
+SELECT
+ ua.user_id,
+ ua.session_id,
+ sam.category_id,
+ sam.points
+FROM
+ user_answers ua
+JOIN
+ self_assessment_mappings sam ON
+ ua.question_id = sam.question_id AND
+ (ua.answer_value->>'selected')::int = sam.answer_value
+WHERE
+ ua.session_id = $1
+),
+category_scores AS (
+SELECT
+ ap.user_id,
+ ap.session_id,
+ ap.category_id,
+ ROUND(AVG(ap.points)::numeric, 2) AS avg_score,
+ SUM(ap.points) AS total_points,
+ COUNT(ap.points) AS question_count
+FROM
+ answer_points ap
+GROUP BY
+ ap.user_id, ap.session_id, ap.category_id
+)
+INSERT INTO user_assessment_scores (
+ user_id,
+ session_id,
+ category_id,
+ score
+)
 SELECT 
-    ua.user_id,
-    ua.session_id,
-    sa.category_id,
-    SUM(
-        CASE 
-            WHEN ua.answer_value ? 'numeric' THEN (ua.answer_value->>'numeric')::INT * sa.points
-            WHEN ua.answer_value ? 'scale' THEN (ua.answer_value->>'scale')::INT * sa.points
-            ELSE 0
-        END
-    ) AS total_score
-FROM user_answers ua
-JOIN self_assessment_mappings sa ON ua.question_id = sa.question_id
-WHERE ua.session_id = $1
-GROUP BY ua.user_id, ua.session_id, sa.category_id
+ user_id, 
+ session_id, 
+ category_id, 
+ avg_score 
+FROM category_scores
 `
 
-func (q *Queries) CalculateUserScores(ctx context.Context, sessionID pgtype.Int4) error {
-	_, err := q.db.Exec(ctx, calculateUserScores, sessionID)
+// Calculates scores by category using mappings
+// Join user answers with mappings to get points for each answer
+// Calculate average score per category
+// Insert category scores
+func (q *Queries) CalculateCategoryScores(ctx context.Context, sessionID pgtype.Int4) error {
+	_, err := q.db.Exec(ctx, calculateCategoryScores, sessionID)
 	return err
 }
 
@@ -103,6 +131,34 @@ func (q *Queries) GetAssessmentQuestionBehavioral(ctx context.Context) ([]SelfAs
 		return nil, err
 	}
 	return items, nil
+}
+
+const getCategoryIDByName = `-- name: GetCategoryIDByName :one
+SELECT id FROM self_assessment_categories 
+WHERE name = $1 
+LIMIT 1
+`
+
+// Gets a category ID by its name
+func (q *Queries) GetCategoryIDByName(ctx context.Context, name pgtype.Text) (int32, error) {
+	row := q.db.QueryRow(ctx, getCategoryIDByName, name)
+	var id int32
+	err := row.Scan(&id)
+	return id, err
+}
+
+const getQuestionIDByText = `-- name: GetQuestionIDByText :one
+SELECT id FROM self_assessment_questions 
+WHERE question = $1 
+LIMIT 1
+`
+
+// Gets a question ID by its text
+func (q *Queries) GetQuestionIDByText(ctx context.Context, question string) (int32, error) {
+	row := q.db.QueryRow(ctx, getQuestionIDByText, question)
+	var id int32
+	err := row.Scan(&id)
+	return id, err
 }
 
 const getUserAnswerBySession = `-- name: GetUserAnswerBySession :many
@@ -369,5 +425,27 @@ func (q *Queries) InsertUserAnswer(ctx context.Context, arg InsertUserAnswerPara
 		arg.QuestionID,
 		arg.AnswerValue,
 	)
+	return err
+}
+
+const mapQuestionToCategory = `-- name: MapQuestionToCategory :exec
+INSERT INTO self_assessment_mappings (question_id, answer_value, category_id, points)
+VALUES 
+  ($1, 1, $2, 1),
+  ($1, 2, $2, 2),
+  ($1, 3, $2, 3),
+  ($1, 4, $2, 4),
+  ($1, 5, $2, 5)
+ON CONFLICT DO NOTHING
+`
+
+type MapQuestionToCategoryParams struct {
+	QuestionID int32
+	CategoryID int32
+}
+
+// Maps a question to a category using question ID and category ID
+func (q *Queries) MapQuestionToCategory(ctx context.Context, arg MapQuestionToCategoryParams) error {
+	_, err := q.db.Exec(ctx, mapQuestionToCategory, arg.QuestionID, arg.CategoryID)
 	return err
 }

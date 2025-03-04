@@ -1,0 +1,1 @@
+DELETE FROM self_assessment_categories;

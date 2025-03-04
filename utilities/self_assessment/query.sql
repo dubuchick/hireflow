@@ -50,24 +50,6 @@ INSERT INTO user_answers (
     $1, $2, $3, $4
 ) RETURNING *;
 
--- name: CalculateUserScores :exec
-INSERT INTO user_assessment_scores (user_id, session_id, category_id, score)
-SELECT 
-    ua.user_id,
-    ua.session_id,
-    sa.category_id,
-    SUM(
-        CASE 
-            WHEN ua.answer_value ? 'numeric' THEN (ua.answer_value->>'numeric')::INT * sa.points
-            WHEN ua.answer_value ? 'scale' THEN (ua.answer_value->>'scale')::INT * sa.points
-            ELSE 0
-        END
-    ) AS total_score
-FROM user_answers ua
-JOIN self_assessment_mappings sa ON ua.question_id = sa.question_id
-WHERE ua.session_id = $1
-GROUP BY ua.user_id, ua.session_id, sa.category_id;
-
 -- name: CompleteAssessmentSession :exec
 UPDATE user_assessment_sessions
 SET completed_at = NOW()
@@ -102,3 +84,73 @@ LIMIT 1;
 SELECT assessment_type, completed_at 
 FROM user_assessment_sessions
 WHERE user_id = $1 AND completed_at IS NOT NULL;
+
+-- name: CalculateCategoryScores :exec
+/* Calculates scores by category using mappings */
+WITH answer_points AS (
+-- Join user answers with mappings to get points for each answer
+SELECT
+ ua.user_id,
+ ua.session_id,
+ sam.category_id,
+ sam.points
+FROM
+ user_answers ua
+JOIN
+ self_assessment_mappings sam ON
+ ua.question_id = sam.question_id AND
+ (ua.answer_value->>'selected')::int = sam.answer_value
+WHERE
+ ua.session_id = $1
+),
+category_scores AS (
+-- Calculate average score per category
+SELECT
+ ap.user_id,
+ ap.session_id,
+ ap.category_id,
+ ROUND(AVG(ap.points)::numeric, 2) AS avg_score,
+ SUM(ap.points) AS total_points,
+ COUNT(ap.points) AS question_count
+FROM
+ answer_points ap
+GROUP BY
+ ap.user_id, ap.session_id, ap.category_id
+)
+-- Insert category scores
+INSERT INTO user_assessment_scores (
+ user_id,
+ session_id,
+ category_id,
+ score
+)
+SELECT 
+ user_id, 
+ session_id, 
+ category_id, 
+ avg_score 
+FROM category_scores;
+
+
+-- name: MapQuestionToCategory :exec
+/* Maps a question to a category using question ID and category ID */
+INSERT INTO self_assessment_mappings (question_id, answer_value, category_id, points)
+VALUES 
+  ($1, 1, $2, 1),
+  ($1, 2, $2, 2),
+  ($1, 3, $2, 3),
+  ($1, 4, $2, 4),
+  ($1, 5, $2, 5)
+ON CONFLICT DO NOTHING;
+
+-- name: GetQuestionIDByText :one
+/* Gets a question ID by its text */
+SELECT id FROM self_assessment_questions 
+WHERE question = $1 
+LIMIT 1;
+
+-- name: GetCategoryIDByName :one
+/* Gets a category ID by its name */
+SELECT id FROM self_assessment_categories 
+WHERE name = $1 
+LIMIT 1;
