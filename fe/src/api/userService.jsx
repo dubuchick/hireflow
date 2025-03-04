@@ -19,13 +19,9 @@ export const login = async (credentials) => {
       // Set the token in the Authorization header for subsequent requests
       api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
-      // For debugging
-      console.log("Token stored successfully:", token.substring(0, 20) + "...");
-
       // Verify we can decode the token properly
       try {
         const decoded = jwtDecode(token);
-        console.log("User ID from token:", decoded.sub);
       } catch (err) {
         console.error("Error decoding token during login:", err);
       }

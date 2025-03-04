@@ -88,9 +88,6 @@ export const Header = ({ onLogout, user }) => {
               />
             </MenuButton>
             <MenuList>
-              <MenuItem>Profile</MenuItem>
-              <MenuItem>Settings</MenuItem>
-              <MenuItem>Help</MenuItem>
               <MenuItem onClick={onLogout}>Sign out</MenuItem>
             </MenuList>
           </Menu>

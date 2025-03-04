@@ -66,8 +66,7 @@ const LoginPage = ({ onLoginSuccess }) => {
       try {
         // Call the login API
         const response = await login({ email, password });
-        console.log("Login response:", response.data);
-        
+      
         const token = response.data.token;
 
         // Store token in localStorage
@@ -75,12 +74,10 @@ const LoginPage = ({ onLoginSuccess }) => {
 
         // Decode the JWT to get user info
         const decodedToken = decodeJWT(token);
-        console.log("Decoded token:", decodedToken);
-        
+       
         // Parse role_id as integer
         const roleId = parseInt(decodedToken.role_id || 2, 10);
-        console.log("Extracted role ID:", roleId);
-
+       
         // Store role_id in localStorage
         localStorage.setItem("role_id", roleId);
 
@@ -99,8 +96,6 @@ const LoginPage = ({ onLoginSuccess }) => {
           email: decodedToken.email,
           role_id: roleId,
         };
-        
-        console.log("Calling onLoginSuccess with:", userData);
         
         // Call the onLoginSuccess function to redirect to dashboard
         if (onLoginSuccess) {

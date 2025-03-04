@@ -72,7 +72,6 @@ const App = () => {
     const checkAuth = () => {
       const token = localStorage.getItem("token");
       const roleId = localStorage.getItem("role_id");
-      console.log("Token in storage:", token);
       if (token && roleId) {
         setUser({
           isLoggedIn: true,
