@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Flex,
@@ -19,13 +19,16 @@ import {
   Badge,
   useToast,
 } from "@chakra-ui/react";
-import { useNavigate } from "react-router-dom"; // Make sure to install react-router if you haven't
+import { useNavigate } from "react-router-dom";
+import {
+  getAssessmentStatus,
+  setupAuthHeadersFromStorage,
+} from "../api/userService"; // Make sure to install react-router if you haven't
 
 // Placeholder icons (you can replace with actual icons from a library like react-icons)
 const MenuIcon = () => <span>☰</span>;
 const BellIcon = () => <span>🔔</span>;
 const UserIcon = () => <span>👤</span>;
-
 export const Header = ({ onLogout, user }) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const bgColor = useColorModeValue("white", "gray.800");
@@ -113,35 +116,81 @@ export const MainLayout = ({ children, onLogout, user }) => {
 };
 
 const Dashboard = ({ onLogout, user }) => {
+  // Initialize assessments with default "Loading" status
   const [assessments, setAssessments] = useState([
     {
       id: 1,
       type: "Behavioral",
-      status: "Not Started",
+      status: "Loading...",
       description: "Assess your workplace behaviors and tendencies",
     },
     {
       id: 2,
       type: "Personality",
-      status: "Not Started",
+      status: "Loading...",
       description: "Understand your personality traits and preferences",
     },
     {
       id: 3,
       type: "Cognitive",
-      status: "Not Started",
+      status: "Loading...",
       description: "Evaluate your problem-solving and reasoning abilities",
     },
   ]);
 
   const toast = useToast();
-  const navigate = useNavigate(); // If using react-router
+  const navigate = useNavigate();
+// Clean version without unnecessary logging
+useEffect(() => {
+    const fetchAssessmentStatus = async () => {
+      try {
+        // Get raw API response
+        const response = await getAssessmentStatus();
+        
+        // Update assessments based on what we can find
+        if (response) {
+          setAssessments((prev) =>
+            prev.map((assessment) => {
+              const type = assessment.type.toLowerCase();
+              let isCompleted = false;
+              
+              // Try all possible paths to find the completed status
+              if (response.assessments_completed && 
+                  response.assessments_completed[type] === true) {
+                isCompleted = true;
+              } else if (response[type] === true) {
+                isCompleted = true;
+              } else if (response.data && 
+                        response.data.assessments_completed && 
+                        response.data.assessments_completed[type] === true) {
+                isCompleted = true;
+              }
+              
+              return {
+                ...assessment,
+                status: isCompleted ? "Completed" : "Not Started",
+              };
+            })
+          );
+        }
+      } catch (error) {
+        console.error("Error fetching assessment status:", error);
+        // Set default statuses in case of error
+        setAssessments((prev) =>
+          prev.map((assessment) => ({
+            ...assessment,
+            status: "Not Started",
+          }))
+        );
+      }
+    };
+    
+    fetchAssessmentStatus();
+  }, [toast]);
 
   const handleStartAssessment = (assessmentType) => {
-    // Option 1: If using react-router, navigate to the assessment page
-    // navigate(`/assessment/${assessmentType.toLowerCase()}`);
+    const type = assessmentType.toLowerCase();
 
-    // Option 2: If not using react-router, you can use a state-based approach
     toast({
       title: "Starting Assessment",
       description: `You are about to start the ${assessmentType} assessment. Once started, you must complete it.`,
@@ -150,12 +199,10 @@ const Dashboard = ({ onLogout, user }) => {
       isClosable: true,
     });
 
-    // Here you would typically navigate or change your app state to show the assessment
-    // For demonstration, let's just log it
-    navigate(`/assessment/${assessmentType.toLowerCase()}`);
-    console.log(`Starting ${assessmentType} assessment`);
+    navigate(`/assessment/${type}`);
   };
 
+  // This function is left for potential future use
   const updateAssessmentStatus = (type, newStatus) => {
     setAssessments(
       assessments.map((assessment) =>
@@ -203,6 +250,8 @@ const Dashboard = ({ onLogout, user }) => {
                         ? "green"
                         : assessment.status === "In Progress"
                         ? "blue"
+                        : assessment.status === "Loading..."
+                        ? "gray"
                         : "gray"
                     }
                     p={2}
@@ -219,12 +268,17 @@ const Dashboard = ({ onLogout, user }) => {
                       assessment.status === "Completed" ? "green" : "blue"
                     }
                     onClick={() => handleStartAssessment(assessment.type)}
-                    isDisabled={assessment.status === "Completed"}
+                    isDisabled={
+                      assessment.status === "Completed" ||
+                      assessment.status === "Loading..."
+                    }
                   >
                     {assessment.status === "Completed"
                       ? "View Results"
                       : assessment.status === "In Progress"
                       ? "Continue"
+                      : assessment.status === "Loading..."
+                      ? "Loading..."
                       : "Start Assessment"}
                   </Button>
                 </Flex>

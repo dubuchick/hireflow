@@ -190,13 +190,7 @@ func (h *SelfAssessmentHandler) GetUserAssessmentStatus(c *gin.Context) {
         c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
         return
     }
-    
-    // Define the SQLC query (you'll need to add this to your .sql file)
-    // -- name: GetUserCompletedAssessments :many
-    // SELECT assessment_type, completed_at 
-    // FROM user_assessment_session
-    // WHERE user_id = $1 AND completed_at IS NOT NULL;
-    
+	
     completedAssessments, err := h.queries.GetUserCompletedAssessments(c, int32(userID))
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch assessment status"})
