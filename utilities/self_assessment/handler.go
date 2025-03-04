@@ -200,6 +200,16 @@ func (h *SelfAssessmentHandler) GetSelfAssessmentBehavioral(c *gin.Context) {
 	c.JSON(http.StatusOK, questions)
 }
 
+func (h *SelfAssessmentHandler) GetSelfAssessmentPersonality(c *gin.Context) {
+	questions, err := h.queries.GetAssessmentQuestionPersonality(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get questions"})
+		return
+	}
+
+	c.JSON(http.StatusOK, questions)
+}
+
 // GetUserAssessmentStatus checks if a user has completed assessments
 func (h *SelfAssessmentHandler) GetUserAssessmentStatus(c *gin.Context) {
 	// Get user ID from token
@@ -327,4 +337,99 @@ func (h *SelfAssessmentHandler) GetCandidateScores(c *gin.Context) {
     }
 
     c.JSON(http.StatusOK, candidates)
+}
+
+func (h *SelfAssessmentHandler) SubmitPersonalityAssessment(c *gin.Context) {
+    var req struct {
+        UserID  int32 `json:"user_id" binding:"required"`
+        Answers []struct {
+            QuestionID   int32  `json:"question_id" binding:"required"`
+            AnswerValue  string `json:"answer_value" binding:"required"`
+        } `json:"answers" binding:"required"`
+    }
+    
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    // Create a new assessment session
+    session, err := h.queries.CreateAssessmentSession(c, CreateAssessmentSessionParams{
+        UserID:          req.UserID,
+        AssessmentType:  "personality",
+    })
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create session"})
+        return
+    }
+    sessionID := session.ID
+
+    // Insert each answer
+    for _, answer := range req.Answers {
+        // Determine points based on answer value
+        var points int = 0
+        
+        // Try to convert directly to a number
+        if p, err := strconv.Atoi(answer.AnswerValue); err == nil {
+            points = p
+        } else {
+            // Default points based on standard options
+            switch answer.AnswerValue {
+            case "1":
+                points = 1
+            case "2":
+                points = 2
+            case "3":
+                points = 3
+            case "4":
+                points = 4
+            default:
+                points = 2 // Default to middle value
+            }
+        }
+
+        // Create answer JSONB structure
+        answerJSON := map[string]interface{}{
+            "selected": answer.AnswerValue,
+            "points":   points,
+        }
+
+        // Convert to JSON
+        answerBytes, err := json.Marshal(answerJSON)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process answer"})
+            return
+        }
+
+        // Store the answer
+        err = h.queries.InsertUserAnswer(c, InsertUserAnswerParams{
+            UserID:       pgtype.Int4{Int32: req.UserID, Valid: true},
+            SessionID:    pgtype.Int4{Int32: sessionID, Valid: true},
+            QuestionID:   pgtype.Int4{Int32: answer.QuestionID, Valid: true},
+            AnswerValue:  answerBytes,
+        })
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to insert answer: %v", err)})
+            return
+        }
+    }
+
+    // Calculate personality category scores
+    err = h.queries.CalculatePersonalityScores(c, pgtype.Int4{Int32: sessionID, Valid: true})
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to calculate scores: %v", err)})
+        return
+    }
+
+    // Mark session as completed
+    err = h.queries.CompleteAssessmentSession(c, sessionID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to complete session: %v", err)})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "message":     "Personality assessment completed successfully",
+        "session_id":  sessionID,
+    })
 }

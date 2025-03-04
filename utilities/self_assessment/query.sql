@@ -74,6 +74,10 @@ WHERE session_id = $1;
 SELECT * from self_assessment_questions
 where type = 'behavioral';
 
+-- name: GetAssessmentQuestionPersonality :many
+SELECT * from self_assessment_questions
+where type = 'personality';
+
 -- name: GetUserBehavioralAssessmentSession :one
 SELECT uas.id 
 FROM user_assessment_sessions uas
@@ -195,3 +199,49 @@ WHERE
   score_rank = 1
 ORDER BY 
   user_id;
+
+-- name: CalculatePersonalityScores :exec
+WITH answer_points AS (
+  SELECT
+    ua.user_id,
+    ua.session_id,
+    sam.category_id,
+    sam.points
+  FROM
+    user_answers ua
+  JOIN
+    self_assessment_mappings sam ON
+    ua.question_id = sam.question_id AND
+    (ua.answer_value->>'selected')::int = sam.answer_value
+  WHERE
+    ua.session_id = $1
+),
+category_scores AS (
+  SELECT
+    ap.user_id,
+    ap.session_id,
+    ap.category_id,
+    sac.name AS category_name,
+    ROUND(AVG(ap.points)::numeric, 2) AS avg_score,
+    SUM(ap.points) AS total_points,
+    COUNT(ap.points) AS question_count
+  FROM
+    answer_points ap
+  JOIN
+    self_assessment_categories sac ON ap.category_id = sac.id
+  GROUP BY
+    ap.user_id, ap.session_id, ap.category_id, sac.name
+)
+-- Insert category scores
+INSERT INTO user_assessment_scores (
+  user_id,
+  session_id,
+  category_id,
+  score
+)
+SELECT
+  user_id,
+  session_id,
+  category_id,
+  avg_score
+FROM category_scores;

@@ -4,13 +4,19 @@ import {
   extendTheme,
   CSSReset,
   Spinner,
-  Flex
+  Flex,
 } from "@chakra-ui/react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import LoginPage from "./components/LoginPage";
 import Dashboard from "./components/Dashboard";
 import AdminDashboard from "./components/AdminDashboard";
 import BehavioralAssessment from "./components/BehavioralAssessment";
+import PersonalityAssessment from "./components/PersonalityAssessment";
 // Import other assessment types as needed
 
 // Theme configuration
@@ -48,12 +54,12 @@ const ProtectedRoute = ({ user, children, requiredRole }) => {
   if (!user?.isLoggedIn) {
     return <Navigate to="/login" replace />;
   }
-  
+
   // If a requiredRole is specified, check against user's role
   if (requiredRole && user.role_id !== requiredRole) {
     return <Navigate to="/dashboard" replace />;
   }
-  
+
   return children;
 };
 
@@ -64,13 +70,13 @@ const App = () => {
   // Check for existing authentication on component mount
   useEffect(() => {
     const checkAuth = () => {
-      const token = localStorage.getItem('token');
-      const roleId = localStorage.getItem('role_id');
+      const token = localStorage.getItem("token");
+      const roleId = localStorage.getItem("role_id");
       console.log("Token in storage:", token);
       if (token && roleId) {
-        setUser({ 
-          isLoggedIn: true, 
-          role_id: parseInt(roleId) 
+        setUser({
+          isLoggedIn: true,
+          role_id: parseInt(roleId),
         });
       }
       setIsLoading(false);
@@ -80,14 +86,14 @@ const App = () => {
 
   // Handle successful login
   const handleLoginSuccess = (userData) => {
-    localStorage.setItem('role_id', userData.role_id);
+    localStorage.setItem("role_id", userData.role_id);
     setUser({ ...userData, isLoggedIn: true });
   };
 
   // Handle logout
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('role_id');
+    localStorage.removeItem("token");
+    localStorage.removeItem("role_id");
     setUser(null);
   };
 
@@ -113,9 +119,11 @@ const App = () => {
           <Route
             path="/login"
             element={
-              user?.isLoggedIn ? 
-              <Navigate to="/dashboard" replace /> : 
-              <LoginPage onLoginSuccess={handleLoginSuccess} />
+              user?.isLoggedIn ? (
+                <Navigate to="/dashboard" replace />
+              ) : (
+                <LoginPage onLoginSuccess={handleLoginSuccess} />
+              )
             }
           />
           <Route
@@ -135,6 +143,18 @@ const App = () => {
             element={
               <ProtectedRoute user={user}>
                 <BehavioralAssessment
+                  user={user}
+                  onLogout={handleLogout}
+                  onComplete={handleAssessmentComplete}
+                />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/assessment/personality"
+            element={
+              <ProtectedRoute user={user}>
+                <PersonalityAssessment
                   user={user}
                   onLogout={handleLogout}
                   onComplete={handleAssessmentComplete}

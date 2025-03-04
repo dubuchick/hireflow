@@ -63,6 +63,58 @@ func (q *Queries) CalculateCategoryScores(ctx context.Context, sessionID pgtype.
 	return err
 }
 
+const calculatePersonalityScores = `-- name: CalculatePersonalityScores :exec
+WITH answer_points AS (
+  SELECT
+    ua.user_id,
+    ua.session_id,
+    sam.category_id,
+    sam.points
+  FROM
+    user_answers ua
+  JOIN
+    self_assessment_mappings sam ON
+    ua.question_id = sam.question_id AND
+    (ua.answer_value->>'selected')::int = sam.answer_value
+  WHERE
+    ua.session_id = $1
+),
+category_scores AS (
+  SELECT
+    ap.user_id,
+    ap.session_id,
+    ap.category_id,
+    sac.name AS category_name,
+    ROUND(AVG(ap.points)::numeric, 2) AS avg_score,
+    SUM(ap.points) AS total_points,
+    COUNT(ap.points) AS question_count
+  FROM
+    answer_points ap
+  JOIN
+    self_assessment_categories sac ON ap.category_id = sac.id
+  GROUP BY
+    ap.user_id, ap.session_id, ap.category_id, sac.name
+)
+INSERT INTO user_assessment_scores (
+  user_id,
+  session_id,
+  category_id,
+  score
+)
+SELECT
+  user_id,
+  session_id,
+  category_id,
+  avg_score
+FROM category_scores
+`
+
+// Insert category scores
+func (q *Queries) CalculatePersonalityScores(ctx context.Context, sessionID pgtype.Int4) error {
+	_, err := q.db.Exec(ctx, calculatePersonalityScores, sessionID)
+	return err
+}
+
 const completeAssessmentSession = `-- name: CompleteAssessmentSession :exec
 UPDATE user_assessment_sessions
 SET completed_at = NOW()
@@ -108,6 +160,38 @@ where type = 'behavioral'
 
 func (q *Queries) GetAssessmentQuestionBehavioral(ctx context.Context) ([]SelfAssessmentQuestion, error) {
 	rows, err := q.db.Query(ctx, getAssessmentQuestionBehavioral)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SelfAssessmentQuestion
+	for rows.Next() {
+		var i SelfAssessmentQuestion
+		if err := rows.Scan(
+			&i.ID,
+			&i.Question,
+			&i.Type,
+			&i.Options,
+			&i.CorrectAnswer,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAssessmentQuestionPersonality = `-- name: GetAssessmentQuestionPersonality :many
+SELECT id, question, type, options, correct_answer, created_at from self_assessment_questions
+where type = 'personality'
+`
+
+func (q *Queries) GetAssessmentQuestionPersonality(ctx context.Context) ([]SelfAssessmentQuestion, error) {
+	rows, err := q.db.Query(ctx, getAssessmentQuestionPersonality)
 	if err != nil {
 		return nil, err
 	}
