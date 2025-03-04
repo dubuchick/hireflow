@@ -11,60 +11,16 @@ import {
   Progress,
   useToast,
   Stack,
-  Divider
+  Divider,
 } from "@chakra-ui/react";
 import { MainLayout } from "./Dashboard"; // Assuming MainLayout is exported from Dashboard
-
-// Mock API call - replace with your actual API
-const fetchBehavioralQuestions = async () => {
-  // Replace this with your actual API call
-  return [
-    {
-      id: 1,
-      question: "I remain calm and focused under pressure",
-      type: "behavioral",
-      options: {
-        "1": {"text": "Strongly Disagree", "points": 1},
-        "2": {"text": "Disagree", "points": 2},
-        "3": {"text": "Neutral", "points": 3},
-        "4": {"text": "Agree", "points": 4},
-        "5": {"text": "Strongly Agree", "points": 5}
-      }
-    },
-    {
-      id: 2,
-      question: "I prefer working in teams rather than individually",
-      type: "behavioral",
-      options: {
-        "1": {"text": "Strongly Disagree", "points": 1},
-        "2": {"text": "Disagree", "points": 2},
-        "3": {"text": "Neutral", "points": 3},
-        "4": {"text": "Agree", "points": 4},
-        "5": {"text": "Strongly Agree", "points": 5}
-      }
-    },
-    {
-      id: 3,
-      question: "I adapt quickly to changing circumstances",
-      type: "behavioral",
-      options: {
-        "1": {"text": "Strongly Disagree", "points": 1},
-        "2": {"text": "Disagree", "points": 2},
-        "3": {"text": "Neutral", "points": 3},
-        "4": {"text": "Agree", "points": 4},
-        "5": {"text": "Strongly Agree", "points": 5}
-      }
-    }
-    // Add more questions as needed
-  ];
-};
-
-// Function to submit answers
-const submitAnswers = async (answers) => {
-  // Replace with your actual API call
-  console.log("Submitting answers:", answers);
-  return { success: true };
-};
+import {
+  getSelfAssessmentBehavioral,
+  submitBehavioralAssessment,
+  setupAuthHeadersFromStorage,
+} from "../api/userService";
+import { useNavigate } from "react-router-dom";
+import base64 from "base-64"; // Import Base64 decoder
 
 const BehavioralAssessment = ({ onLogout, user, onComplete }) => {
   const [questions, setQuestions] = useState([]);
@@ -73,15 +29,30 @@ const BehavioralAssessment = ({ onLogout, user, onComplete }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const toast = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const loadQuestions = async () => {
+    setupAuthHeadersFromStorage();
+    const fetchBehavioralQuestions = async () => {
       try {
-        const data = await fetchBehavioralQuestions();
-        setQuestions(data);
-        setIsLoading(false);
+        const response = await getSelfAssessmentBehavioral();
+        const formattedQuestions = response.data.map((item) => ({
+          id: item.ID,
+          question: item.Question,
+          type: item.Type,
+          options: JSON.parse(base64.decode(item.Options)), // Decode Base64 options
+        }));
+
+        setQuestions(formattedQuestions);
+
+        // Initialize answers state with empty values
+        const initialAnswers = {};
+        formattedQuestions.forEach((q) => {
+          initialAnswers[q.id] = "";
+        });
+        setAnswers(initialAnswers);
       } catch (error) {
-        console.error("Error loading questions:", error);
+        console.error("Error fetching behavioral questions:", error);
         toast({
           title: "Error",
           description: "Failed to load assessment questions.",
@@ -89,11 +60,12 @@ const BehavioralAssessment = ({ onLogout, user, onComplete }) => {
           duration: 3000,
           isClosable: true,
         });
+      } finally {
         setIsLoading(false);
       }
     };
 
-    loadQuestions();
+    fetchBehavioralQuestions();
   }, [toast]);
 
   const handleAnswer = (value) => {
@@ -116,7 +88,6 @@ const BehavioralAssessment = ({ onLogout, user, onComplete }) => {
   };
 
   const handleSubmit = async () => {
-    // Check if all questions are answered
     if (Object.keys(answers).length < questions.length) {
       toast({
         title: "Warning",
@@ -129,8 +100,21 @@ const BehavioralAssessment = ({ onLogout, user, onComplete }) => {
     }
 
     setIsSubmitting(true);
+
     try {
-      await submitAnswers(answers);
+      // Format answers for API
+      const formattedAnswers = Object.entries(answers).map(
+        ([questionId, value]) => ({
+          question_id: parseInt(questionId),
+          answer_value: value,
+        })
+      );
+
+      // Make sure auth is set up before submitting
+      setupAuthHeadersFromStorage();
+
+      const response = await submitBehavioralAssessment(formattedAnswers);
+
       toast({
         title: "Success",
         description: "Assessment completed successfully!",
@@ -138,16 +122,22 @@ const BehavioralAssessment = ({ onLogout, user, onComplete }) => {
         duration: 3000,
         isClosable: true,
       });
-      
-      // Call the onComplete callback to update the dashboard
+
+      // Call onComplete if provided (for any additional logic)
       if (onComplete) {
-        onComplete("behavioral");
+        onComplete("behavioral", response.data.session_id);
       }
+
+      // Set a short delay before redirecting to provide user feedback
+      setTimeout(() => {
+        // Redirect to dashboard
+        navigate("/dashboard");
+      }, 1500); // 1.5 second delay to show the success message
     } catch (error) {
       console.error("Error submitting answers:", error);
       toast({
         title: "Error",
-        description: "Failed to submit assessment.",
+        description: error.message || "Failed to submit assessment.",
         status: "error",
         duration: 3000,
         isClosable: true,
@@ -177,7 +167,8 @@ const BehavioralAssessment = ({ onLogout, user, onComplete }) => {
         <Box>
           <Heading size="lg">Behavioral Assessment</Heading>
           <Text mt={2} color="gray.600">
-            Please answer all questions honestly based on how you typically behave.
+            Please answer all questions honestly based on how you typically
+            behave.
           </Text>
         </Box>
 
@@ -204,11 +195,13 @@ const BehavioralAssessment = ({ onLogout, user, onComplete }) => {
             mb={8}
           >
             <Stack spacing={4} direction="column">
-              {Object.entries(currentQuestionData.options).map(([key, option]) => (
-                <Radio key={key} value={key} colorScheme="blue">
-                  {option.text}
-                </Radio>
-              ))}
+              {Object.entries(currentQuestionData.options).map(
+                ([key, option]) => (
+                  <Radio key={key} value={key} colorScheme="blue">
+                    {option.text}
+                  </Radio>
+                )
+              )}
             </Stack>
           </RadioGroup>
 
@@ -222,7 +215,7 @@ const BehavioralAssessment = ({ onLogout, user, onComplete }) => {
             >
               Previous
             </Button>
-            
+
             {currentQuestion < questions.length - 1 ? (
               <Button
                 onClick={handleNext}

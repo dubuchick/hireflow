@@ -199,6 +199,51 @@ func (q *Queries) GetUserAssessmentSessions(ctx context.Context, userID int32) (
 	return items, nil
 }
 
+const getUserBehavioralAssessmentSession = `-- name: GetUserBehavioralAssessmentSession :one
+SELECT uas.id 
+FROM user_assessment_sessions uas
+WHERE uas.user_id = $1 AND uas.assessment_type = 'behavioral'
+LIMIT 1
+`
+
+func (q *Queries) GetUserBehavioralAssessmentSession(ctx context.Context, userID int32) (int32, error) {
+	row := q.db.QueryRow(ctx, getUserBehavioralAssessmentSession, userID)
+	var id int32
+	err := row.Scan(&id)
+	return id, err
+}
+
+const getUserCompletedAssessments = `-- name: GetUserCompletedAssessments :many
+SELECT assessment_type, completed_at 
+FROM user_assessment_sessions
+WHERE user_id = $1 AND completed_at IS NOT NULL
+`
+
+type GetUserCompletedAssessmentsRow struct {
+	AssessmentType string
+	CompletedAt    pgtype.Timestamp
+}
+
+func (q *Queries) GetUserCompletedAssessments(ctx context.Context, userID int32) ([]GetUserCompletedAssessmentsRow, error) {
+	rows, err := q.db.Query(ctx, getUserCompletedAssessments, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetUserCompletedAssessmentsRow
+	for rows.Next() {
+		var i GetUserCompletedAssessmentsRow
+		if err := rows.Scan(&i.AssessmentType, &i.CompletedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const insertCategory = `-- name: InsertCategory :one
 INSERT INTO self_assessment_categories(
     name,
@@ -303,11 +348,11 @@ func (q *Queries) InsertQuestion(ctx context.Context, arg InsertQuestionParams) 
 }
 
 const insertUserAnswer = `-- name: InsertUserAnswer :exec
-INSERT INTO user_answers(
-    user_id, session_id,question_id, answer_value
-)VALUES(
-    $1,$2,$3,$4
-)RETURNING id, user_id, session_id, question_id, answer_value
+INSERT INTO user_answers (
+    user_id, session_id, question_id, answer_value
+) VALUES (
+    $1, $2, $3, $4
+) RETURNING id, user_id, session_id, question_id, answer_value
 `
 
 type InsertUserAnswerParams struct {

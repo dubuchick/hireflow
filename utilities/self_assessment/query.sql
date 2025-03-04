@@ -44,11 +44,11 @@ INSERT INTO user_assessment_sessions(
 )RETURNING *;
 
 -- name: InsertUserAnswer :exec
-INSERT INTO user_answers(
-    user_id, session_id,question_id, answer_value
-)VALUES(
-    $1,$2,$3,$4
-)RETURNING *;
+INSERT INTO user_answers (
+    user_id, session_id, question_id, answer_value
+) VALUES (
+    $1, $2, $3, $4
+) RETURNING *;
 
 -- name: CalculateUserScores :exec
 INSERT INTO user_assessment_scores (user_id, session_id, category_id, score)
@@ -91,3 +91,14 @@ WHERE session_id = $1;
 -- name: GetAssessmentQuestionBehavioral :many
 SELECT * from self_assessment_questions
 where type = 'behavioral';
+
+-- name: GetUserBehavioralAssessmentSession :one
+SELECT uas.id 
+FROM user_assessment_sessions uas
+WHERE uas.user_id = $1 AND uas.assessment_type = 'behavioral'
+LIMIT 1;
+
+-- name: GetUserCompletedAssessments :many
+SELECT assessment_type, completed_at 
+FROM user_assessment_sessions
+WHERE user_id = $1 AND completed_at IS NOT NULL;
