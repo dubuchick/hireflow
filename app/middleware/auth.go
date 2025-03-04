@@ -41,15 +41,12 @@ func AuthMiddleware() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-
-		// Extract claims from the token
+		
 		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-			// Get the user ID from the 'sub' claim and set it in the context
 			if userID, exists := claims["sub"]; exists {
-				// Convert to string if it's not already
+				// Convert to string 
 				userIDStr := fmt.Sprintf("%v", userID)
 
-				// Set the user ID in the context
 				c.Set("userID", userIDStr)
 			}
 		}
