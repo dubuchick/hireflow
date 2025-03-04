@@ -10,5 +10,5 @@ func SetupRoutesSelfAssessment(r *gin.Engine, selfAssessmentHandler *SelfAssessm
 	auth.Use(middleware.AuthMiddleware())
 	auth.POST("/category", selfAssessmentHandler.InsertCategory)
 	auth.POST("/question", selfAssessmentHandler.InsertQuestion)
-	auth.GET("/self-assessment/question/behavioral", selfAssessmentHandler.GetSelfAssessmentBehavioral)
+	auth.GET("/question/behavioral", selfAssessmentHandler.GetSelfAssessmentBehavioral)
 }

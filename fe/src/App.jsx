@@ -6,8 +6,11 @@ import {
   Spinner,
   Flex
 } from "@chakra-ui/react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./components/LoginPage";
 import Dashboard from "./components/Dashboard";
+import BehavioralAssessment from "./components/BehavioralAssessment";
+// Import other assessment types as needed
 
 // Theme configuration
 const theme = extendTheme({
@@ -39,6 +42,15 @@ const theme = extendTheme({
   },
 });
 
+// Route guard component
+const ProtectedRoute = ({ user, children }) => {
+  if (!user?.isLoggedIn) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return children;
+};
+
 const App = () => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,11 +59,11 @@ const App = () => {
   useEffect(() => {
     const checkAuth = () => {
       const token = localStorage.getItem('token');
-      const roleId = localStorage.getItem('role_id'); // Store role_id in localStorage during login
+      const roleId = localStorage.getItem('role_id');
       
       console.log("Token in storage:", token);
       if (token && roleId) {
-        setUser({ isLoggedIn: true, role_id: parseInt(roleId) }); // Ensure role_id is an integer
+        setUser({ isLoggedIn: true, role_id: parseInt(roleId) });
       }
       
       setIsLoading(false);
@@ -62,7 +74,7 @@ const App = () => {
 
   // Handle successful login
   const handleLoginSuccess = (userData) => {
-    localStorage.setItem('role_id', userData.role_id); // Store role_id in localStorage
+    localStorage.setItem('role_id', userData.role_id);
     setUser({ ...userData, isLoggedIn: true });
   };
 
@@ -71,6 +83,11 @@ const App = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('role_id');
     setUser(null);
+  };
+
+  // Handle assessment completion
+  const handleAssessmentComplete = (type) => {
+    console.log(`${type} assessment completed`);
   };
 
   // Show loading spinner while checking authentication
@@ -82,19 +99,47 @@ const App = () => {
     );
   }
 
-  // Render the appropriate component based on role
   return (
     <ChakraProvider theme={theme}>
       <CSSReset />
-      {user?.isLoggedIn ? (
-        user.role_id === 1 ? ( // Assuming 1 is for Admin, 2 is for Candidate
-          <AdminDashboard user={user} onLogout={handleLogout} />
-        ) : (
-          <Dashboard user={user} onLogout={handleLogout} />
-        )
-      ) : (
-        <LoginPage onLoginSuccess={handleLoginSuccess} />
-      )}
+      <Router>
+        <Routes>
+          <Route 
+            path="/login" 
+            element={
+              user?.isLoggedIn ? 
+                <Navigate to="/dashboard" replace /> : 
+                <LoginPage onLoginSuccess={handleLoginSuccess} />
+            } 
+          />
+          
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute user={user}>
+                <Dashboard user={user} onLogout={handleLogout} />
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route 
+            path="/assessment/behavioral" 
+            element={
+              <ProtectedRoute user={user}>
+                <BehavioralAssessment 
+                  user={user} 
+                  onLogout={handleLogout} 
+                  onComplete={handleAssessmentComplete}
+                />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Add routes for other assessment types as needed */}
+          
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </Router>
     </ChakraProvider>
   );
 };

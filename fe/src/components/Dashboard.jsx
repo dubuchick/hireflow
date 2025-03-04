@@ -16,16 +16,17 @@ import {
   Avatar,
   Container,
   VStack,
-  Progress,
   Badge,
+  useToast,
 } from "@chakra-ui/react";
+import { useNavigate } from "react-router-dom"; // Make sure to install react-router if you haven't
 
 // Placeholder icons (you can replace with actual icons from a library like react-icons)
 const MenuIcon = () => <span>☰</span>;
 const BellIcon = () => <span>🔔</span>;
 const UserIcon = () => <span>👤</span>;
 
-const Header = ({ onLogout, user }) => {
+export const Header = ({ onLogout, user }) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const bgColor = useColorModeValue("white", "gray.800");
   const borderColor = useColorModeValue("gray.200", "gray.700");
@@ -50,16 +51,18 @@ const Header = ({ onLogout, user }) => {
           display={{ md: "none" }}
           onClick={isOpen ? onClose : onOpen}
         />
-        
+
         <HStack spacing={8} alignItems="center">
-          <Heading size="md" color="blue.500">HireFlow</Heading>
+          <Heading size="md" color="blue.500">
+            HireFlow
+          </Heading>
           <HStack as="nav" spacing={4} display={{ base: "none", md: "flex" }}>
             <Button variant="ghost">Dashboard</Button>
             <Button variant="ghost">Assessments</Button>
-            <Button variant="ghost">Progress</Button>
+            <Button variant="ghost">Results</Button>
           </HStack>
         </HStack>
-        
+
         <Flex alignItems="center">
           <IconButton
             size="md"
@@ -96,7 +99,7 @@ const Header = ({ onLogout, user }) => {
   );
 };
 
-const MainLayout = ({ children, onLogout, user }) => {
+export const MainLayout = ({ children, onLogout, user }) => {
   return (
     <Box minH="100vh" bg={useColorModeValue("gray.50", "gray.900")}>
       <Header onLogout={onLogout} user={user} />
@@ -110,56 +113,119 @@ const MainLayout = ({ children, onLogout, user }) => {
 };
 
 const Dashboard = ({ onLogout, user }) => {
-  const [tests] = useState([
-    { type: "Behavioral", status: "Completed", progress: 100 },
-    { type: "Personality", status: "In Progress", progress: 65 },
-    { type: "Cognitive", status: "Not Started", progress: 0 },
+  const [assessments, setAssessments] = useState([
+    {
+      id: 1,
+      type: "Behavioral",
+      status: "Not Started",
+      description: "Assess your workplace behaviors and tendencies",
+    },
+    {
+      id: 2,
+      type: "Personality",
+      status: "Not Started",
+      description: "Understand your personality traits and preferences",
+    },
+    {
+      id: 3,
+      type: "Cognitive",
+      status: "Not Started",
+      description: "Evaluate your problem-solving and reasoning abilities",
+    },
   ]);
+
+  const toast = useToast();
+  const navigate = useNavigate(); // If using react-router
+
+  const handleStartAssessment = (assessmentType) => {
+    // Option 1: If using react-router, navigate to the assessment page
+    // navigate(`/assessment/${assessmentType.toLowerCase()}`);
+
+    // Option 2: If not using react-router, you can use a state-based approach
+    toast({
+      title: "Starting Assessment",
+      description: `You are about to start the ${assessmentType} assessment. Once started, you must complete it.`,
+      status: "info",
+      duration: 5000,
+      isClosable: true,
+    });
+
+    // Here you would typically navigate or change your app state to show the assessment
+    // For demonstration, let's just log it
+    navigate(`/assessment/${assessmentType.toLowerCase()}`);
+    console.log(`Starting ${assessmentType} assessment`);
+  };
+
+  const updateAssessmentStatus = (type, newStatus) => {
+    setAssessments(
+      assessments.map((assessment) =>
+        assessment.type.toLowerCase() === type.toLowerCase()
+          ? { ...assessment, status: newStatus }
+          : assessment
+      )
+    );
+  };
 
   return (
     <MainLayout onLogout={onLogout} user={user}>
       <VStack spacing={8} align="stretch">
         <Heading size="lg">
-          Welcome to HireFlow{user?.name ? `, ${user.name}` : ''}
+          Welcome to HireFlow{user?.name ? `, ${user.name}` : ""}
         </Heading>
-        <Text>Track your assessment progress below</Text>
-        
+        <Text fontSize="lg">
+          Below are the assessments you need to complete. Each assessment must
+          be completed in a single session once started.
+        </Text>
+
         <Box borderRadius="lg" boxShadow="md" bg="white" p={6}>
-          <Heading size="md" mb={4}>Your Assessments</Heading>
+          <Heading size="md" mb={4}>
+            Your Assessments
+          </Heading>
           <VStack spacing={4} align="stretch">
-            {tests.map((test, index) => (
-              <Box key={index} p={4} borderWidth="1px" borderRadius="md">
-                <Flex justify="space-between" align="center" mb={2}>
-                  <Heading size="sm">{test.type} Assessment</Heading>
+            {assessments.map((assessment) => (
+              <Box
+                key={assessment.id}
+                p={6}
+                borderWidth="1px"
+                borderRadius="md"
+                position="relative"
+              >
+                <Flex justify="space-between" align="center" mb={3}>
+                  <Box>
+                    <Heading size="md">{assessment.type} Assessment</Heading>
+                    <Text color="gray.600" mt={1}>
+                      {assessment.description}
+                    </Text>
+                  </Box>
                   <Badge
                     colorScheme={
-                      test.status === "Completed"
+                      assessment.status === "Completed"
                         ? "green"
-                        : test.status === "In Progress"
+                        : assessment.status === "In Progress"
                         ? "blue"
                         : "gray"
                     }
+                    p={2}
+                    borderRadius="md"
                   >
-                    {test.status}
+                    {assessment.status}
                   </Badge>
                 </Flex>
-                <Progress
-                  value={test.progress}
-                  size="sm"
-                  colorScheme="blue"
-                  borderRadius="full"
-                  mb={2}
-                />
-                <Flex justify="space-between">
-                  <Text fontSize="sm">{test.progress}% completed</Text>
+
+                <Flex mt={4}>
+                  <Box flex="1"></Box> {/* Spacer */}
                   <Button
-                    size="sm"
-                    colorScheme="blue"
-                    variant={test.status === "Completed" ? "outline" : "solid"}
+                    colorScheme={
+                      assessment.status === "Completed" ? "green" : "blue"
+                    }
+                    onClick={() => handleStartAssessment(assessment.type)}
+                    isDisabled={assessment.status === "Completed"}
                   >
-                    {test.status === "Completed"
+                    {assessment.status === "Completed"
                       ? "View Results"
-                      : "Continue"}
+                      : assessment.status === "In Progress"
+                      ? "Continue"
+                      : "Start Assessment"}
                   </Button>
                 </Flex>
               </Box>

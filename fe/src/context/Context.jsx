@@ -20,8 +20,6 @@ export const AuthProvider = ({ children }) => {
       
       if (token) {
         try {
-          // You might want to validate the token with your backend
-          // For now, we'll just set a simple user object
           setUser({ isLoggedIn: true });
         } catch (err) {
           console.error('Auth validation error:', err);

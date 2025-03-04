@@ -1,4 +1,4 @@
-DB_DSN="postgresql://postgres:H34XeEpky1JxLd4Z@limpidly-thriving-peccary.data-1.use1.tembo.io:5432/postgres"
+DB_DSN="postgresql://postgres:yourpassword@localhost:5432/postgres?sslmode=disable"
 MIGRATIONS_PATH=./migrations
 
 migrate-up:
