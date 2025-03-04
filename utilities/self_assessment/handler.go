@@ -210,6 +210,16 @@ func (h *SelfAssessmentHandler) GetSelfAssessmentPersonality(c *gin.Context) {
 	c.JSON(http.StatusOK, questions)
 }
 
+func (h *SelfAssessmentHandler) GetSelfAssessmentCognitive(c *gin.Context) {
+	questions, err := h.queries.GetAssessmentQuestionCognitive(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get questions"})
+		return
+	}
+
+	c.JSON(http.StatusOK, questions)
+}
+
 // GetUserAssessmentStatus checks if a user has completed assessments
 func (h *SelfAssessmentHandler) GetUserAssessmentStatus(c *gin.Context) {
 	// Get user ID from token
@@ -349,7 +359,7 @@ func (h *SelfAssessmentHandler) SubmitAssessment(c *gin.Context) {
 	}
 
 	// Validate assessment type
-	if assessmentType != "behavioral" && assessmentType != "personality" {
+	if assessmentType != "behavioral" && assessmentType != "personality" && assessmentType != "cognitive" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid assessment type"})
 		return
 	}
@@ -379,55 +389,89 @@ func (h *SelfAssessmentHandler) SubmitAssessment(c *gin.Context) {
 	}
 	sessionID := session.ID
 
-	// Insert each answer
-	for _, answer := range req.Answers {
-		// Determine points based on answer value
-		var points int = 0
-		// Try to convert directly to a number
-		if p, err := strconv.Atoi(answer.AnswerValue); err == nil {
-			points = p
-		} else {
-			// Default points based on standard options
-			switch answer.AnswerValue {
-			case "1":
-				points = 1
-			case "2":
-				points = 2
-			case "3":
-				points = 3
-			case "4":
-				points = 4
-			default:
-				points = 2 // Default to middle value
+	// Replace your existing "Insert each answer" loop with this:
+	if assessmentType == "cognitive" {
+		// Special handling for cognitive answers
+		for _, answer := range req.Answers {
+			// For cognitive, convert answer to integer
+			answerInt, err := strconv.Atoi(answer.AnswerValue)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid answer value format: %v", err)})
+				return
+			}
+
+			// Create answer JSONB structure
+			answerJSON := map[string]interface{}{
+				"selected": answerInt, // Store as number (will be JSON number)
+				"points":   0,         // Points will be calculated during scoring
+			}
+
+			// Convert to JSON
+			answerBytes, err := json.Marshal(answerJSON)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process answer"})
+				return
+			}
+
+			// Store the answer
+			err = h.queries.InsertUserAnswer(c, InsertUserAnswerParams{
+				UserID:      pgtype.Int4{Int32: req.UserID, Valid: true},
+				SessionID:   pgtype.Int4{Int32: sessionID, Valid: true},
+				QuestionID:  pgtype.Int4{Int32: answer.QuestionID, Valid: true},
+				AnswerValue: answerBytes,
+			})
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to insert answer: %v", err)})
+				return
 			}
 		}
-
-		// Create answer JSONB structure
-		answerJSON := map[string]interface{}{
-			"selected": answer.AnswerValue,
-			"points":   points,
-		}
-
-		// Convert to JSON
-		answerBytes, err := json.Marshal(answerJSON)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process answer"})
-			return
-		}
-
-		// Store the answer
-		err = h.queries.InsertUserAnswer(c, InsertUserAnswerParams{
-			UserID:      pgtype.Int4{Int32: req.UserID, Valid: true},
-			SessionID:   pgtype.Int4{Int32: sessionID, Valid: true},
-			QuestionID:  pgtype.Int4{Int32: answer.QuestionID, Valid: true},
-			AnswerValue: answerBytes,
-		})
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to insert answer: %v", err)})
-			return
+	} else {
+		// Your existing code for behavioral and personality assessments
+		for _, answer := range req.Answers {
+			// Determine points based on answer value
+			var points int = 0
+			// Try to convert directly to a number
+			if p, err := strconv.Atoi(answer.AnswerValue); err == nil {
+				points = p
+			} else {
+				// Default points based on standard options
+				switch answer.AnswerValue {
+				case "1":
+					points = 1
+				case "2":
+					points = 2
+				case "3":
+					points = 3
+				case "4":
+					points = 4
+				default:
+					points = 2 // Default to middle value
+				}
+			}
+			// Create answer JSONB structure
+			answerJSON := map[string]interface{}{
+				"selected": answer.AnswerValue,
+				"points":   points,
+			}
+			// Convert to JSON
+			answerBytes, err := json.Marshal(answerJSON)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process answer"})
+				return
+			}
+			// Store the answer
+			err = h.queries.InsertUserAnswer(c, InsertUserAnswerParams{
+				UserID:      pgtype.Int4{Int32: req.UserID, Valid: true},
+				SessionID:   pgtype.Int4{Int32: sessionID, Valid: true},
+				QuestionID:  pgtype.Int4{Int32: answer.QuestionID, Valid: true},
+				AnswerValue: answerBytes,
+			})
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to insert answer: %v", err)})
+				return
+			}
 		}
 	}
-
 	// Calculate scores based on assessment type
 	var calcErr error
 	switch assessmentType {
@@ -435,6 +479,8 @@ func (h *SelfAssessmentHandler) SubmitAssessment(c *gin.Context) {
 		calcErr = h.queries.CalculateBehavioralScores(c, pgtype.Int4{Int32: sessionID, Valid: true})
 	case "personality":
 		calcErr = h.queries.CalculatePersonalityScores(c, pgtype.Int4{Int32: sessionID, Valid: true})
+	case "cognitive":
+		calcErr = h.queries.CalculateCognitiveScores(c, pgtype.Int4{Int32: sessionID, Valid: true})
 	}
 
 	if calcErr != nil {
@@ -492,39 +538,39 @@ func (h *SelfAssessmentHandler) GetSessionScores(c *gin.Context) {
 }
 
 func (h *SelfAssessmentHandler) GetCandidateAssessmentDetails(c *gin.Context) {
-    var req struct {
-        UserID int32 `json:"user_id" binding:"required"`
-        AssessmentType string `json:"assessment_type" binding:"required"`
-    }
-    
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "User ID and assessment type required"})
-        return
-    }
-    
-    // Create the params struct according to your SQLC-generated type
-    params := GetCandidateAssessmentResultsParams{
-        UserID: pgtype.Int4{Int32: req.UserID, Valid: true},
-        AssessmentType: req.AssessmentType,
-    }
-    
-    results, err := h.queries.GetCandidateAssessmentResults(c, params)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve assessment details"})
-        return
-    }
-    
-    // Get the latest session if multiple exist
-    var latestSessionID int32
-    if len(results) > 0 {
-        // Extract the Int32 value from the pgtype.Int4 field
-        latestSessionID = results[0].SessionID.Int32
-    }
-    
-    c.JSON(http.StatusOK, gin.H{
-        "user_id": req.UserID,
-        "assessment_type": req.AssessmentType,
-        "session_id": latestSessionID,
-        "results": results,
-    })
+	var req struct {
+		UserID         int32  `json:"user_id" binding:"required"`
+		AssessmentType string `json:"assessment_type" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID and assessment type required"})
+		return
+	}
+
+	// Create the params struct according to your SQLC-generated type
+	params := GetCandidateAssessmentResultsParams{
+		UserID:         pgtype.Int4{Int32: req.UserID, Valid: true},
+		AssessmentType: req.AssessmentType,
+	}
+
+	results, err := h.queries.GetCandidateAssessmentResults(c, params)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve assessment details"})
+		return
+	}
+
+	// Get the latest session if multiple exist
+	var latestSessionID int32
+	if len(results) > 0 {
+		// Extract the Int32 value from the pgtype.Int4 field
+		latestSessionID = results[0].SessionID.Int32
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"user_id":         req.UserID,
+		"assessment_type": req.AssessmentType,
+		"session_id":      latestSessionID,
+		"results":         results,
+	})
 }

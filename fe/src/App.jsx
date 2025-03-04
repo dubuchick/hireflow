@@ -17,6 +17,7 @@ import Dashboard from "./components/Dashboard";
 import AdminDashboard from "./components/AdminDashboard";
 import BehavioralAssessment from "./components/BehavioralAssessment";
 import PersonalityAssessment from "./components/PersonalityAssessment";
+import CognitiveAssessment from "./components/CognitiveAssessment";
 // Import other assessment types as needed
 
 // Theme configuration
@@ -154,6 +155,18 @@ const App = () => {
             element={
               <ProtectedRoute user={user}>
                 <PersonalityAssessment
+                  user={user}
+                  onLogout={handleLogout}
+                  onComplete={handleAssessmentComplete}
+                />
+              </ProtectedRoute>
+            }
+          />
+           <Route
+            path="/assessment/cognitive"
+            element={
+              <ProtectedRoute user={user}>
+                <CognitiveAssessment
                   user={user}
                   onLogout={handleLogout}
                   onComplete={handleAssessmentComplete}

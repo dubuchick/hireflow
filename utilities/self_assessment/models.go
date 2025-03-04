@@ -77,6 +77,15 @@ type SelfAssessmentQuestion struct {
 	CreatedAt     pgtype.Timestamp
 }
 
+type User struct {
+	ID        int32
+	RoleID    pgtype.Int4
+	Name      string
+	Email     string
+	Password  string
+	CreatedAt pgtype.Timestamp
+}
+
 type UserAnswer struct {
 	ID          int32
 	UserID      pgtype.Int4

@@ -48,6 +48,10 @@ export const getSelfAssessmentPersonality = () => {
   return api.get("/self-assessment/question/personality");
 };
 
+export const getSelfAssessmentCognitive = () => {
+  return api.get("/self-assessment/question/cognitive");
+};
+
 // Function to get user ID from token
 export const getUserIdFromToken = () => {
   // Try to get the token from localStorage
@@ -185,6 +189,51 @@ export const submitPersonalityAssessment = async (answers) => {
     return response;
   } catch (error) {
     console.error("Error submitting personality assessment:", error);
+    throw error;
+  }
+};
+
+// Function for submitting cognitive assessment
+export const submitCognitiveAssessment = async (answers) => {
+  // Ensure the token is set in the API headers
+  const token = localStorage.getItem("auth_token");
+  if (token) {
+    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+  } else {
+    console.error("No token found before submitting assessment");
+    return Promise.reject(
+      new Error("Authentication token not found. Please login again.")
+    );
+  }
+  
+  try {
+    // Get user ID from token
+    const userId = getUserIdFromToken();
+    console.log("User ID for cognitive assessment submission:", userId);
+    if (!userId) {
+      return Promise.reject(
+        new Error("User ID not found. Please login again.")
+      );
+    }
+    
+    // Parse the user ID to ensure it's in the right format
+    const parsedUserId = parseInt(userId, 10);
+    if (isNaN(parsedUserId)) {
+      console.error("Invalid user ID format:", userId);
+      return Promise.reject(
+        new Error("Invalid user ID format. Please login again.")
+      );
+    }
+    
+    // Make the API request with the user ID
+    const response = await api.post("/self-assessment/submit/cognitive", {
+      user_id: parsedUserId,
+      answers: answers,
+    });
+    
+    return response;
+  } catch (error) {
+    console.error("Error submitting cognitive assessment:", error);
     throw error;
   }
 };

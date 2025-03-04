@@ -106,13 +106,16 @@ WITH answers AS (
   SELECT 
     ua.session_id, 
     ua.question_id,
-    (ua.answer_value->>'points')::int as points,
+    (ua.answer_value->>'selected')::int as selected_answer,
+    sam.answer_value as correct_answer,
+    CASE 
+      WHEN (ua.answer_value->>'selected')::int = sam.answer_value THEN sam.points
+      ELSE 0
+    END as points,
     sam.category_id
   FROM user_answers ua
   JOIN self_assessment_mappings sam ON 
-    sam.question_id = ua.question_id AND 
-    -- Cognitive assessments may have different answer mapping
-    sam.answer_value = (ua.answer_value->>'selected')
+    sam.question_id = ua.question_id
   JOIN user_assessment_sessions uas ON 
     uas.id = ua.session_id
   WHERE 
@@ -235,6 +238,38 @@ where type = 'behavioral'
 
 func (q *Queries) GetAssessmentQuestionBehavioral(ctx context.Context) ([]SelfAssessmentQuestion, error) {
 	rows, err := q.db.Query(ctx, getAssessmentQuestionBehavioral)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SelfAssessmentQuestion
+	for rows.Next() {
+		var i SelfAssessmentQuestion
+		if err := rows.Scan(
+			&i.ID,
+			&i.Question,
+			&i.Type,
+			&i.Options,
+			&i.CorrectAnswer,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAssessmentQuestionCognitive = `-- name: GetAssessmentQuestionCognitive :many
+SELECT id, question, type, options, correct_answer, created_at from self_assessment_questions
+where type = 'cognitive'
+`
+
+func (q *Queries) GetAssessmentQuestionCognitive(ctx context.Context) ([]SelfAssessmentQuestion, error) {
+	rows, err := q.db.Query(ctx, getAssessmentQuestionCognitive)
 	if err != nil {
 		return nil, err
 	}

@@ -1,11 +1,11 @@
+import { useState, useEffect } from "react";
 import { MainLayout } from "./Dashboard";
 import { getCandidateScores, getCandidateDetails } from "../api/adminService";
-import { useState, useEffect } from "react";
 import {
   VStack,
+  Box,
   Heading,
   Text,
-  Box,
   TableContainer,
   Table,
   Thead,
@@ -173,23 +173,31 @@ const AdminDashboard = ({ onLogout, user }) => {
     setIsLoadingDetails(true);
     
     try {
-      // Fetch detailed assessment results
+      // Fetch personality assessment results
       const personalityResponse = await getCandidateDetails({
         user_id: userId,
         assessment_type: "personality"
       });
       
-      setCandidateDetails(personalityResponse.data);
+      // Fetch cognitive assessment results
+      const cognitiveResponse = await getCandidateDetails({
+        user_id: userId,
+        assessment_type: "cognitive"
+      });
       
-      // Check if we got valid results
+      // Set combined data
+      setCandidateDetails({
+        personality: personalityResponse.data,
+        cognitive: cognitiveResponse.data
+      });
+      
+      // Process personality data if available
       if (personalityResponse.data && 
           personalityResponse.data.results && 
           personalityResponse.data.results.length > 0) {
-        // Process and consolidate category scores
         const processed = processResults(personalityResponse.data.results);
         setConsolidatedScores(processed);
       } else {
-        // Clear consolidated scores if no data
         setConsolidatedScores({});
       }
       
@@ -222,6 +230,21 @@ const AdminDashboard = ({ onLogout, user }) => {
     if (score >= 2.5) return "blue";
     if (score >= 1.5) return "orange";
     return "red";
+  };
+
+  const getCognitiveScoreColor = (score) => {
+    if (score >= 8) return "green";
+    if (score >= 4) return "blue";
+    if (score >= 1) return "orange";
+    return "red";
+  };
+
+  // Interpret cognitive scores
+  const interpretCognitiveScore = (score) => {
+    if (score >= 8) return "Excellent";
+    if (score >= 4) return "Good";
+    if (score >= 1) return "Average";
+    return "Needs Development";
   };
 
   return (
@@ -333,16 +356,15 @@ const AdminDashboard = ({ onLogout, user }) => {
           </ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            {!candidateDetails || !candidateDetails.results || candidateDetails.results.length === 0 ? (
+            {(!candidateDetails || 
+            (!candidateDetails.personality?.results || candidateDetails.personality.results.length === 0) && 
+            (!candidateDetails.cognitive?.results || candidateDetails.cognitive.results.length === 0)) ? (
               <Box p={6} textAlign="center">
                 <Heading size="md" color="gray.500" mb={4}>
-                  No Personality Assessment Data
+                  No Assessment Data
                 </Heading>
                 <Text fontSize="lg">
-                  This user hasn't completed a personality test yet.
-                </Text>
-                <Text mt={4} color="gray.600">
-                  Once they complete the personality assessment, detailed results will appear here.
+                  This user hasn't completed cognitive/ personality assessment yet.
                 </Text>
               </Box>
             ) : (
@@ -350,44 +372,65 @@ const AdminDashboard = ({ onLogout, user }) => {
                 <TabList>
                   <Tab>Personality Profile</Tab>
                   <Tab>Personality Type</Tab>
+                  <Tab>Cognitive Profile</Tab>
                   <Tab>Detailed Scores</Tab>
                 </TabList>
 
                 <TabPanels>
                   {/* Personality Profile Tab */}
                   <TabPanel>
-                    <SimpleGrid columns={1} spacing={4}>
-                      {Object.values(consolidatedScores).map((category, index) => (
-                        <Box 
-                          key={`profile-${index}`} 
-                          p={4} 
-                          borderWidth="1px" 
-                          borderRadius="md"
-                          shadow="sm"
-                        >
-                          <Flex justifyContent="space-between" alignItems="center" mb={2}>
-                            <Heading size="sm">{category.name}</Heading>
-                            <Badge colorScheme={getScoreColor(category.averageScore)}>
-                              Score: {category.averageScore}
-                            </Badge>
-                          </Flex>
-                          <Text fontSize="sm" color="gray.600" mb={3}>
-                            {category.description}
-                          </Text>
-                          <Progress 
-                            value={(category.averageScore / 4) * 100} 
-                            colorScheme={getScoreColor(category.averageScore)}
-                            size="sm"
-                            borderRadius="full"
-                          />
-                        </Box>
-                      ))}
-                    </SimpleGrid>
+                    {!candidateDetails.personality?.results || candidateDetails.personality.results.length === 0 ? (
+                      <Box p={6} textAlign="center">
+                        <Heading size="md" color="gray.500" mb={4}>
+                          No Personality Assessment Data
+                        </Heading>
+                        <Text fontSize="lg">
+                          This user hasn't completed a personality test yet.
+                        </Text>
+                      </Box>
+                    ) : (
+                      <SimpleGrid columns={1} spacing={4}>
+                        {Object.values(consolidatedScores).map((category, index) => (
+                          <Box 
+                            key={`profile-${index}`} 
+                            p={4} 
+                            borderWidth="1px" 
+                            borderRadius="md"
+                            shadow="sm"
+                          >
+                            <Flex justifyContent="space-between" alignItems="center" mb={2}>
+                              <Heading size="sm">{category.name}</Heading>
+                              <Badge colorScheme={getScoreColor(category.averageScore)}>
+                                Score: {category.averageScore}
+                              </Badge>
+                            </Flex>
+                            <Text fontSize="sm" color="gray.600" mb={3}>
+                              {category.description}
+                            </Text>
+                            <Progress 
+                              value={(category.averageScore / 4) * 100} 
+                              colorScheme={getScoreColor(category.averageScore)}
+                              size="sm"
+                              borderRadius="full"
+                            />
+                          </Box>
+                        ))}
+                      </SimpleGrid>
+                    )}
                   </TabPanel>
 
                   {/* Personality Type Tab */}
                   <TabPanel>
-                    {Object.keys(consolidatedScores).length > 0 && (
+                    {!candidateDetails.personality?.results || candidateDetails.personality.results.length === 0 ? (
+                      <Box p={6} textAlign="center">
+                        <Heading size="md" color="gray.500" mb={4}>
+                          No Personality Assessment Data
+                        </Heading>
+                        <Text fontSize="lg">
+                          This user hasn't completed a personality test yet.
+                        </Text>
+                      </Box>
+                    ) : Object.keys(consolidatedScores).length > 0 && (
                       <Box 
                         p={6} 
                         borderWidth="1px" 
@@ -449,32 +492,153 @@ const AdminDashboard = ({ onLogout, user }) => {
                     )}
                   </TabPanel>
 
+                  {/* Cognitive Profile Tab */}
+                  <TabPanel>
+                    {!candidateDetails.cognitive?.results || candidateDetails.cognitive.results.length === 0 ? (
+                      <Box p={6} textAlign="center">
+                        <Heading size="md" color="gray.500" mb={4}>
+                          No Cognitive Assessment Data
+                        </Heading>
+                        <Text fontSize="lg">
+                          This user hasn't completed a cognitive assessment yet.
+                        </Text>
+                      </Box>
+                    ) : (
+                      <Box>
+                        <Heading size="md" mb={4}>Cognitive Abilities</Heading>
+                        <SimpleGrid columns={1} spacing={4}>
+                          {candidateDetails.cognitive.results.map((result, index) => (
+                            <Box 
+                              key={`cognitive-${index}`} 
+                              p={4} 
+                              borderWidth="1px" 
+                              borderRadius="md"
+                              shadow="sm"
+                            >
+                              <Flex justifyContent="space-between" alignItems="center" mb={2}>
+                                <Heading size="sm">{result.CategoryName}</Heading>
+                                <Badge colorScheme={getCognitiveScoreColor(result.Score)}>
+                                  Score: {result.Score}
+                                </Badge>
+                              </Flex>
+                              <Text fontSize="sm" color="gray.600" mb={3}>
+                                {result.CategoryDescription}
+                              </Text>
+                              <Progress 
+                                value={(result.Score / 12) * 100} 
+                                colorScheme={getCognitiveScoreColor(result.Score)}
+                                size="sm"
+                                borderRadius="full"
+                              />
+                              <Text mt={2} fontSize="sm" textAlign="right">
+                                {interpretCognitiveScore(result.Score)}
+                              </Text>
+                            </Box>
+                          ))}
+                        </SimpleGrid>
+
+                        <Box mt={6} p={4} borderWidth="1px" borderRadius="md" bg="gray.50">
+                          <Heading size="sm" mb={3}>Cognitive Assessment Interpretation</Heading>
+                          <Text fontSize="sm">
+                            Scores are based on correct answers to questions in each category:
+                          </Text>
+                          <SimpleGrid columns={[1, 2, 4]} spacing={4} mt={3}>
+                            <Box p={2} bg="green.100" borderRadius="md">
+                              <Text fontWeight="bold">8-12: Excellent</Text>
+                              <Text fontSize="xs">Strong proficiency</Text>
+                            </Box>
+                            <Box p={2} bg="blue.100" borderRadius="md">
+                              <Text fontWeight="bold">4-7: Good</Text>
+                              <Text fontSize="xs">Competent performance</Text>
+                            </Box>
+                            <Box p={2} bg="orange.100" borderRadius="md">
+                              <Text fontWeight="bold">1-3: Average</Text>
+                              <Text fontSize="xs">Basic understanding</Text>
+                            </Box>
+                            <Box p={2} bg="red.100" borderRadius="md">
+                              <Text fontWeight="bold">0: Needs Development</Text>
+                              <Text fontSize="xs">Area for improvement</Text>
+                            </Box>
+                          </SimpleGrid>
+                        </Box>
+                      </Box>
+                    )}
+                  </TabPanel>
+
                   {/* Detailed Scores Tab */}
                   <TabPanel>
-                    <TableContainer>
-                      <Table variant="simple" size="sm">
-                        <Thead>
-                          <Tr>
-                            <Th>Category</Th>
-                            <Th>Score</Th>
-                            <Th>Description</Th>
-                          </Tr>
-                        </Thead>
-                        <Tbody>
-                          {candidateDetails.results.map((result, index) => (
-                            <Tr key={`table-${index}`}>
-                              <Td>{result.CategoryName}</Td>
-                              <Td>
-                                <Badge colorScheme={getScoreColor(result.Score)}>
-                                  {result.Score}
-                                </Badge>
-                              </Td>
-                              <Td>{result.CategoryDescription}</Td>
-                            </Tr>
-                          ))}
-                        </Tbody>
-                      </Table>
-                    </TableContainer>
+                    <Tabs variant="soft-rounded" colorScheme="blue">
+                      <TabList mb={4}>
+                        <Tab>Personality</Tab>
+                        <Tab>Cognitive</Tab>
+                      </TabList>
+                      <TabPanels>
+                        <TabPanel p={0}>
+                          {!candidateDetails.personality?.results || candidateDetails.personality.results.length === 0 ? (
+                            <Box p={6} textAlign="center" bg="gray.50" borderRadius="md">
+                              <Text>No personality assessment data available</Text>
+                            </Box>
+                          ) : (
+                            <TableContainer>
+                              <Table variant="simple" size="sm">
+                                <Thead>
+                                  <Tr>
+                                    <Th>Category</Th>
+                                    <Th>Score</Th>
+                                    <Th>Description</Th>
+                                  </Tr>
+                                </Thead>
+                                <Tbody>
+                                  {candidateDetails.personality.results.map((result, index) => (
+                                    <Tr key={`personality-table-${index}`}>
+                                      <Td>{result.CategoryName}</Td>
+                                      <Td>
+                                        <Badge colorScheme={getScoreColor(result.Score)}>
+                                          {result.Score}
+                                        </Badge>
+                                      </Td>
+                                      <Td>{result.CategoryDescription}</Td>
+                                    </Tr>
+                                  ))}
+                                </Tbody>
+                              </Table>
+                            </TableContainer>
+                          )}
+                        </TabPanel>
+                        <TabPanel p={0}>
+                          {!candidateDetails.cognitive?.results || candidateDetails.cognitive.results.length === 0 ? (
+                            <Box p={6} textAlign="center" bg="gray.50" borderRadius="md">
+                              <Text>No cognitive assessment data available</Text>
+                            </Box>
+                          ) : (
+                            <TableContainer>
+                              <Table variant="simple" size="sm">
+                                <Thead>
+                                  <Tr>
+                                    <Th>Category</Th>
+                                    <Th>Score</Th>
+                                    <Th>Description</Th>
+                                  </Tr>
+                                </Thead>
+                                <Tbody>
+                                  {candidateDetails.cognitive.results.map((result, index) => (
+                                    <Tr key={`cognitive-table-${index}`}>
+                                      <Td>{result.CategoryName}</Td>
+                                      <Td>
+                                        <Badge colorScheme={getCognitiveScoreColor(result.Score)}>
+                                          {result.Score}
+                                        </Badge>
+                                      </Td>
+                                      <Td>{result.CategoryDescription}</Td>
+                                    </Tr>
+                                  ))}
+                                </Tbody>
+                              </Table>
+                            </TableContainer>
+                          )}
+                        </TabPanel>
+                      </TabPanels>
+                    </Tabs>
                   </TabPanel>
                 </TabPanels>
               </Tabs>

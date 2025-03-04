@@ -73,6 +73,10 @@ where type = 'behavioral';
 SELECT * from self_assessment_questions
 where type = 'personality';
 
+-- name: GetAssessmentQuestionCognitive :many
+SELECT * from self_assessment_questions
+where type = 'cognitive';
+
 -- name: GetUserBehavioralAssessmentSession :one
 SELECT uas.id 
 FROM user_assessment_sessions uas
@@ -277,39 +281,6 @@ SELECT
 FROM answers a
 GROUP BY a.category_id;
 
--- name: CalculateCognitiveScores :exec
--- Calculate scores for cognitive assessment type
-WITH answers AS (
-  SELECT 
-    ua.session_id, 
-    ua.question_id,
-    (ua.answer_value->>'points')::int as points,
-    sam.category_id
-  FROM user_answers ua
-  JOIN self_assessment_mappings sam ON 
-    sam.question_id = ua.question_id AND 
-    -- Cognitive assessments may have different answer mapping
-    sam.answer_value = (ua.answer_value->>'selected')
-  JOIN user_assessment_sessions uas ON 
-    uas.id = ua.session_id
-  WHERE 
-    ua.session_id = $1 AND
-    uas.assessment_type = 'cognitive'
-)
-INSERT INTO user_assessment_scores (
-  user_id,
-  session_id,
-  category_id,
-  score
-)
-SELECT 
-  (SELECT user_id FROM user_assessment_sessions WHERE id = $1),
-  $1,
-  a.category_id,
-  SUM(a.points)
-FROM answers a
-GROUP BY a.category_id;
-
 -- name: GetSessionScores :many
 -- Get all scores for a specific session with category details
 SELECT 
@@ -353,3 +324,39 @@ WHERE
   uas.user_id = $1 AND
   sess.assessment_type = $2
 ORDER BY sac.name;
+
+-- name: CalculateCognitiveScores :exec
+-- Calculate scores for cognitive assessment type
+WITH answers AS (
+  SELECT 
+    ua.session_id, 
+    ua.question_id,
+    (ua.answer_value->>'selected')::int as selected_answer,
+    sam.answer_value as correct_answer,
+    CASE 
+      WHEN (ua.answer_value->>'selected')::int = sam.answer_value THEN sam.points
+      ELSE 0
+    END as points,
+    sam.category_id
+  FROM user_answers ua
+  JOIN self_assessment_mappings sam ON 
+    sam.question_id = ua.question_id
+  JOIN user_assessment_sessions uas ON 
+    uas.id = ua.session_id
+  WHERE 
+    ua.session_id = $1 AND
+    uas.assessment_type = 'cognitive'
+)
+INSERT INTO user_assessment_scores (
+  user_id,
+  session_id,
+  category_id,
+  score
+)
+SELECT 
+  (SELECT user_id FROM user_assessment_sessions WHERE id = $1),
+  $1,
+  a.category_id,
+  SUM(a.points)
+FROM answers a
+GROUP BY a.category_id;
