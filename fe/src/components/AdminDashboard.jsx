@@ -57,19 +57,19 @@ const AdminDashboard = ({ onLogout, user }) => {
         const response = await getCandidateScores();
         // Process candidates data - group by user
         const candidateData = response.data || [];
-        
+
         // Group by UserID and SessionID to create unique candidate entries
         const uniqueCandidates = [];
         const processed = new Set();
-        
-        candidateData.forEach(entry => {
+
+        candidateData.forEach((entry) => {
           const key = `${entry.UserID}-${entry.SessionID}`;
           if (!processed.has(key)) {
             uniqueCandidates.push(entry);
             processed.add(key);
           }
         });
-        
+
         setCandidates(uniqueCandidates);
       } catch (error) {
         console.error("Error fetching candidate scores:", error);
@@ -90,17 +90,17 @@ const AdminDashboard = ({ onLogout, user }) => {
   // Process results to consolidate duplicate categories
   const processResults = (results) => {
     const categoriesMap = {};
-    
-    results.forEach(result => {
+
+    results.forEach((result) => {
       const categoryName = result.CategoryName;
-      
+
       if (!categoriesMap[categoryName]) {
         categoriesMap[categoryName] = {
           name: categoryName,
           description: result.CategoryDescription,
           scores: [result.Score],
           totalScore: result.Score,
-          count: 1
+          count: 1,
         };
       } else {
         categoriesMap[categoryName].scores.push(result.Score);
@@ -108,13 +108,14 @@ const AdminDashboard = ({ onLogout, user }) => {
         categoriesMap[categoryName].count += 1;
       }
     });
-    
+
     // Calculate average scores for each category
-    Object.keys(categoriesMap).forEach(key => {
-      categoriesMap[key].averageScore = 
-        parseFloat((categoriesMap[key].totalScore / categoriesMap[key].count).toFixed(1));
+    Object.keys(categoriesMap).forEach((key) => {
+      categoriesMap[key].averageScore = parseFloat(
+        (categoriesMap[key].totalScore / categoriesMap[key].count).toFixed(1)
+      );
     });
-    
+
     return categoriesMap;
   };
 
@@ -124,46 +125,63 @@ const AdminDashboard = ({ onLogout, user }) => {
     const sortedCategories = Object.values(consolidatedScores).sort(
       (a, b) => b.averageScore - a.averageScore
     );
-    
+
     // Get top 3 categories
     const topCategories = sortedCategories.slice(0, 3);
-    
+
     // Define personality types based on top categories
-    if (topCategories.some(c => c.name === "Leadership") && 
-        topCategories.some(c => c.name === "Risk Tolerance")) {
+    if (
+      topCategories.some((c) => c.name === "Leadership") &&
+      topCategories.some((c) => c.name === "Risk Tolerance")
+    ) {
       return {
         type: "Strategic Leader",
-        description: "Takes initiative, makes tough decisions, and is willing to take calculated risks to achieve objectives."
+        description:
+          "Takes initiative, makes tough decisions, and is willing to take calculated risks to achieve objectives.",
       };
-    } else if (topCategories.some(c => c.name === "Adaptability") && 
-               topCategories.some(c => c.name === "Learning Approach")) {
+    } else if (
+      topCategories.some((c) => c.name === "Adaptability") &&
+      topCategories.some((c) => c.name === "Learning Approach")
+    ) {
       return {
         type: "Adaptive Learner",
-        description: "Quickly adapts to new situations and continuously seeks to improve skills and knowledge."
+        description:
+          "Quickly adapts to new situations and continuously seeks to improve skills and knowledge.",
       };
-    } else if (topCategories.some(c => c.name === "Communication") && 
-               topCategories.some(c => c.name === "Teamwork")) {
+    } else if (
+      topCategories.some((c) => c.name === "Communication") &&
+      topCategories.some((c) => c.name === "Teamwork")
+    ) {
       return {
         type: "Collaborative Communicator",
-        description: "Excels at interpersonal relationships and working with others to achieve common goals."
+        description:
+          "Excels at interpersonal relationships and working with others to achieve common goals.",
       };
-    } else if (topCategories.some(c => c.name === "Problem-solving") && 
-               topCategories.some(c => c.name === "Goal-orientation")) {
+    } else if (
+      topCategories.some((c) => c.name === "Problem-solving") &&
+      topCategories.some((c) => c.name === "Goal-orientation")
+    ) {
       return {
         type: "Analytical Achiever",
-        description: "Methodical in solving problems and highly focused on reaching objectives."
+        description:
+          "Methodical in solving problems and highly focused on reaching objectives.",
       };
-    } else if (topCategories.some(c => c.name === "Stress Management") && 
-               topCategories.some(c => c.name === "Time Management")) {
+    } else if (
+      topCategories.some((c) => c.name === "Stress Management") &&
+      topCategories.some((c) => c.name === "Time Management")
+    ) {
       return {
         type: "Resilient Organizer",
-        description: "Handles pressure effectively while maintaining productivity and organization."
+        description:
+          "Handles pressure effectively while maintaining productivity and organization.",
       };
     } else {
       // Fallback if no specific combinations match
       return {
         type: "Balanced Professional",
-        description: `Shows strong abilities in ${topCategories.map(c => c.name).join(', ')}.`
+        description: `Shows strong abilities in ${topCategories
+          .map((c) => c.name)
+          .join(", ")}.`,
       };
     }
   };
@@ -171,36 +189,38 @@ const AdminDashboard = ({ onLogout, user }) => {
   const handleViewDetails = async (userId) => {
     setSelectedUserId(userId);
     setIsLoadingDetails(true);
-    
+
     try {
       // Fetch personality assessment results
       const personalityResponse = await getCandidateDetails({
         user_id: userId,
-        assessment_type: "personality"
+        assessment_type: "personality",
       });
-      
+
       // Fetch cognitive assessment results
       const cognitiveResponse = await getCandidateDetails({
         user_id: userId,
-        assessment_type: "cognitive"
+        assessment_type: "cognitive",
       });
-      
+
       // Set combined data
       setCandidateDetails({
         personality: personalityResponse.data,
-        cognitive: cognitiveResponse.data
+        cognitive: cognitiveResponse.data,
       });
-      
+
       // Process personality data if available
-      if (personalityResponse.data && 
-          personalityResponse.data.results && 
-          personalityResponse.data.results.length > 0) {
+      if (
+        personalityResponse.data &&
+        personalityResponse.data.results &&
+        personalityResponse.data.results.length > 0
+      ) {
         const processed = processResults(personalityResponse.data.results);
         setConsolidatedScores(processed);
       } else {
         setConsolidatedScores({});
       }
-      
+
       setIsModalOpen(true);
     } catch (error) {
       console.error("Error fetching candidate details:", error);
@@ -220,9 +240,9 @@ const AdminDashboard = ({ onLogout, user }) => {
 
   const getAssessmentBadgeColor = (score) => {
     if (score !== null) {
-      return score > 0 ? 'blue' : 'gray';
+      return score > 0 ? "blue" : "gray";
     }
-    return 'gray';
+    return "gray";
   };
 
   const getScoreColor = (score) => {
@@ -269,7 +289,6 @@ const AdminDashboard = ({ onLogout, user }) => {
                   <Th>Assessment Status</Th>
                   <Th>Top Behavioral Trait</Th>
                   <Th>Behavioral Score</Th>
-                  <Th>Cognitive Score</Th>
                   <Th>Actions</Th>
                 </Tr>
               </Thead>
@@ -288,21 +307,22 @@ const AdminDashboard = ({ onLogout, user }) => {
                   </Tr>
                 ) : (
                   candidates.map((candidate) => (
-                    <Tr key={`candidate-${candidate.UserID}-${candidate.SessionID}`}>
+                    <Tr
+                      key={`candidate-${candidate.UserID}-${candidate.SessionID}`}
+                    >
                       <Td>{candidate.UserID}</Td>
                       <Td>{candidate.SessionID}</Td>
                       <Td>
                         <Badge
-                          colorScheme={getAssessmentBadgeColor(candidate.TopBehavioralScore)}
+                          colorScheme={getAssessmentBadgeColor(
+                            candidate.TopBehavioralScore
+                          )}
                         >
                           {candidate.AssessmentStatus}
                         </Badge>
                       </Td>
                       <Td>
-                        <Badge
-                          colorScheme="blue"
-                          mr={2}
-                        >
+                        <Badge colorScheme="blue" mr={2}>
                           {candidate.TopBehavioralTrait}
                         </Badge>
                       </Td>
@@ -312,20 +332,14 @@ const AdminDashboard = ({ onLogout, user }) => {
                         </Flex>
                       </Td>
                       <Td>
-                        <Flex align="center">
-                          <Badge colorScheme={getAssessmentBadgeColor(candidate.CognitiveScore)}>
-                            {candidate.CognitiveScore !== undefined && candidate.CognitiveScore !== null 
-                              ? `Score: ${candidate.CognitiveScore}` 
-                              : "Not Taken"}
-                          </Badge>
-                        </Flex>
-                      </Td>
-                      <Td>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           colorScheme="teal"
                           onClick={() => handleViewDetails(candidate.UserID)}
-                          isLoading={isLoadingDetails && selectedUserId === candidate.UserID}
+                          isLoading={
+                            isLoadingDetails &&
+                            selectedUserId === candidate.UserID
+                          }
                         >
                           View Details
                         </Button>
@@ -340,8 +354,8 @@ const AdminDashboard = ({ onLogout, user }) => {
       </VStack>
 
       {/* Candidate Details Modal */}
-      <Modal 
-        isOpen={isModalOpen} 
+      <Modal
+        isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         size="xl"
         scrollBehavior="inside"
@@ -356,15 +370,18 @@ const AdminDashboard = ({ onLogout, user }) => {
           </ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            {(!candidateDetails || 
-            (!candidateDetails.personality?.results || candidateDetails.personality.results.length === 0) && 
-            (!candidateDetails.cognitive?.results || candidateDetails.cognitive.results.length === 0)) ? (
+            {!candidateDetails ||
+            ((!candidateDetails.personality?.results ||
+              candidateDetails.personality.results.length === 0) &&
+              (!candidateDetails.cognitive?.results ||
+                candidateDetails.cognitive.results.length === 0)) ? (
               <Box p={6} textAlign="center">
                 <Heading size="md" color="gray.500" mb={4}>
                   No Assessment Data
                 </Heading>
                 <Text fontSize="lg">
-                  This user hasn't completed cognitive/ personality assessment yet.
+                  This user hasn't completed cognitive/ personality assessment
+                  yet.
                 </Text>
               </Box>
             ) : (
@@ -379,7 +396,8 @@ const AdminDashboard = ({ onLogout, user }) => {
                 <TabPanels>
                   {/* Personality Profile Tab */}
                   <TabPanel>
-                    {!candidateDetails.personality?.results || candidateDetails.personality.results.length === 0 ? (
+                    {!candidateDetails.personality?.results ||
+                    candidateDetails.personality.results.length === 0 ? (
                       <Box p={6} textAlign="center">
                         <Heading size="md" color="gray.500" mb={4}>
                           No Personality Assessment Data
@@ -390,38 +408,51 @@ const AdminDashboard = ({ onLogout, user }) => {
                       </Box>
                     ) : (
                       <SimpleGrid columns={1} spacing={4}>
-                        {Object.values(consolidatedScores).map((category, index) => (
-                          <Box 
-                            key={`profile-${index}`} 
-                            p={4} 
-                            borderWidth="1px" 
-                            borderRadius="md"
-                            shadow="sm"
-                          >
-                            <Flex justifyContent="space-between" alignItems="center" mb={2}>
-                              <Heading size="sm">{category.name}</Heading>
-                              <Badge colorScheme={getScoreColor(category.averageScore)}>
-                                Score: {category.averageScore}
-                              </Badge>
-                            </Flex>
-                            <Text fontSize="sm" color="gray.600" mb={3}>
-                              {category.description}
-                            </Text>
-                            <Progress 
-                              value={(category.averageScore / 4) * 100} 
-                              colorScheme={getScoreColor(category.averageScore)}
-                              size="sm"
-                              borderRadius="full"
-                            />
-                          </Box>
-                        ))}
+                        {Object.values(consolidatedScores).map(
+                          (category, index) => (
+                            <Box
+                              key={`profile-${index}`}
+                              p={4}
+                              borderWidth="1px"
+                              borderRadius="md"
+                              shadow="sm"
+                            >
+                              <Flex
+                                justifyContent="space-between"
+                                alignItems="center"
+                                mb={2}
+                              >
+                                <Heading size="sm">{category.name}</Heading>
+                                <Badge
+                                  colorScheme={getScoreColor(
+                                    category.averageScore
+                                  )}
+                                >
+                                  Score: {category.averageScore}
+                                </Badge>
+                              </Flex>
+                              <Text fontSize="sm" color="gray.600" mb={3}>
+                                {category.description}
+                              </Text>
+                              <Progress
+                                value={(category.averageScore / 4) * 100}
+                                colorScheme={getScoreColor(
+                                  category.averageScore
+                                )}
+                                size="sm"
+                                borderRadius="full"
+                              />
+                            </Box>
+                          )
+                        )}
                       </SimpleGrid>
                     )}
                   </TabPanel>
 
                   {/* Personality Type Tab */}
                   <TabPanel>
-                    {!candidateDetails.personality?.results || candidateDetails.personality.results.length === 0 ? (
+                    {!candidateDetails.personality?.results ||
+                    candidateDetails.personality.results.length === 0 ? (
                       <Box p={6} textAlign="center">
                         <Heading size="md" color="gray.500" mb={4}>
                           No Personality Assessment Data
@@ -430,71 +461,110 @@ const AdminDashboard = ({ onLogout, user }) => {
                           This user hasn't completed a personality test yet.
                         </Text>
                       </Box>
-                    ) : Object.keys(consolidatedScores).length > 0 && (
-                      <Box 
-                        p={6} 
-                        borderWidth="1px" 
-                        borderRadius="lg" 
-                        boxShadow="md"
-                        bg="white"
-                      >
-                        <Center mb={6}>
-                          <VStack>
-                            <Heading size="md" color="teal.600">
-                              {determinePersonalityType(consolidatedScores).type}
-                            </Heading>
-                            <Text textAlign="center" fontSize="md" color="gray.600">
-                              {determinePersonalityType(consolidatedScores).description}
-                            </Text>
-                          </VStack>
-                        </Center>
-                        
-                        <Divider mb={6} />
-                        
-                        <Heading size="sm" mb={4}>Top Strengths</Heading>
-                        <SimpleGrid columns={[1, 2, 3]} spacing={4} mb={6}>
-                          {Object.values(consolidatedScores)
-                            .sort((a, b) => b.averageScore - a.averageScore)
-                            .slice(0, 3)
-                            .map((strength, index) => (
-                              <Stat key={`strength-${index}`} borderWidth="1px" borderRadius="md" p={3}>
-                                <StatLabel>{strength.name}</StatLabel>
-                                <StatNumber>{strength.averageScore}</StatNumber>
-                                <StatHelpText color={getScoreColor(strength.averageScore)}>
-                                  {strength.averageScore >= 3.5 ? "Excellent" : 
-                                   strength.averageScore >= 2.5 ? "Good" : 
-                                   strength.averageScore >= 1.5 ? "Average" : "Needs Development"}
-                                </StatHelpText>
-                              </Stat>
-                            ))
-                          }
-                        </SimpleGrid>
-                        
-                        <Heading size="sm" mb={4}>Areas for Development</Heading>
-                        <SimpleGrid columns={[1, 2, 3]} spacing={4}>
-                          {Object.values(consolidatedScores)
-                            .sort((a, b) => a.averageScore - b.averageScore)
-                            .slice(0, 3)
-                            .map((area, index) => (
-                              <Stat key={`area-${index}`} borderWidth="1px" borderRadius="md" p={3}>
-                                <StatLabel>{area.name}</StatLabel>
-                                <StatNumber>{area.averageScore}</StatNumber>
-                                <StatHelpText color={getScoreColor(area.averageScore)}>
-                                  {area.averageScore >= 3.5 ? "Excellent" : 
-                                   area.averageScore >= 2.5 ? "Good" : 
-                                   area.averageScore >= 1.5 ? "Average" : "Needs Development"}
-                                </StatHelpText>
-                              </Stat>
-                            ))
-                          }
-                        </SimpleGrid>
-                      </Box>
+                    ) : (
+                      Object.keys(consolidatedScores).length > 0 && (
+                        <Box
+                          p={6}
+                          borderWidth="1px"
+                          borderRadius="lg"
+                          boxShadow="md"
+                          bg="white"
+                        >
+                          <Center mb={6}>
+                            <VStack>
+                              <Heading size="md" color="teal.600">
+                                {
+                                  determinePersonalityType(consolidatedScores)
+                                    .type
+                                }
+                              </Heading>
+                              <Text
+                                textAlign="center"
+                                fontSize="md"
+                                color="gray.600"
+                              >
+                                {
+                                  determinePersonalityType(consolidatedScores)
+                                    .description
+                                }
+                              </Text>
+                            </VStack>
+                          </Center>
+
+                          <Divider mb={6} />
+
+                          <Heading size="sm" mb={4}>
+                            Top Strengths
+                          </Heading>
+                          <SimpleGrid columns={[1, 2, 3]} spacing={4} mb={6}>
+                            {Object.values(consolidatedScores)
+                              .sort((a, b) => b.averageScore - a.averageScore)
+                              .slice(0, 3)
+                              .map((strength, index) => (
+                                <Stat
+                                  key={`strength-${index}`}
+                                  borderWidth="1px"
+                                  borderRadius="md"
+                                  p={3}
+                                >
+                                  <StatLabel>{strength.name}</StatLabel>
+                                  <StatNumber>
+                                    {strength.averageScore}
+                                  </StatNumber>
+                                  <StatHelpText
+                                    color={getScoreColor(strength.averageScore)}
+                                  >
+                                    {strength.averageScore >= 3.5
+                                      ? "Excellent"
+                                      : strength.averageScore >= 2.5
+                                      ? "Good"
+                                      : strength.averageScore >= 1.5
+                                      ? "Average"
+                                      : "Needs Development"}
+                                  </StatHelpText>
+                                </Stat>
+                              ))}
+                          </SimpleGrid>
+
+                          <Heading size="sm" mb={4}>
+                            Areas for Development
+                          </Heading>
+                          <SimpleGrid columns={[1, 2, 3]} spacing={4}>
+                            {Object.values(consolidatedScores)
+                              .sort((a, b) => a.averageScore - b.averageScore)
+                              .slice(0, 3)
+                              .map((area, index) => (
+                                <Stat
+                                  key={`area-${index}`}
+                                  borderWidth="1px"
+                                  borderRadius="md"
+                                  p={3}
+                                >
+                                  <StatLabel>{area.name}</StatLabel>
+                                  <StatNumber>{area.averageScore}</StatNumber>
+                                  <StatHelpText
+                                    color={getScoreColor(area.averageScore)}
+                                  >
+                                    {area.averageScore >= 3.5
+                                      ? "Excellent"
+                                      : area.averageScore >= 2.5
+                                      ? "Good"
+                                      : area.averageScore >= 1.5
+                                      ? "Average"
+                                      : "Needs Development"}
+                                  </StatHelpText>
+                                </Stat>
+                              ))}
+                          </SimpleGrid>
+                        </Box>
+                      )
                     )}
                   </TabPanel>
 
                   {/* Cognitive Profile Tab */}
                   <TabPanel>
-                    {!candidateDetails.cognitive?.results || candidateDetails.cognitive.results.length === 0 ? (
+                    {!candidateDetails.cognitive?.results ||
+                    candidateDetails.cognitive.results.length === 0 ? (
                       <Box p={6} textAlign="center">
                         <Heading size="md" color="gray.500" mb={4}>
                           No Cognitive Assessment Data
@@ -505,42 +575,67 @@ const AdminDashboard = ({ onLogout, user }) => {
                       </Box>
                     ) : (
                       <Box>
-                        <Heading size="md" mb={4}>Cognitive Abilities</Heading>
+                        <Heading size="md" mb={4}>
+                          Cognitive Abilities
+                        </Heading>
                         <SimpleGrid columns={1} spacing={4}>
-                          {candidateDetails.cognitive.results.map((result, index) => (
-                            <Box 
-                              key={`cognitive-${index}`} 
-                              p={4} 
-                              borderWidth="1px" 
-                              borderRadius="md"
-                              shadow="sm"
-                            >
-                              <Flex justifyContent="space-between" alignItems="center" mb={2}>
-                                <Heading size="sm">{result.CategoryName}</Heading>
-                                <Badge colorScheme={getCognitiveScoreColor(result.Score)}>
-                                  Score: {result.Score}
-                                </Badge>
-                              </Flex>
-                              <Text fontSize="sm" color="gray.600" mb={3}>
-                                {result.CategoryDescription}
-                              </Text>
-                              <Progress 
-                                value={(result.Score / 12) * 100} 
-                                colorScheme={getCognitiveScoreColor(result.Score)}
-                                size="sm"
-                                borderRadius="full"
-                              />
-                              <Text mt={2} fontSize="sm" textAlign="right">
-                                {interpretCognitiveScore(result.Score)}
-                              </Text>
-                            </Box>
-                          ))}
+                          {candidateDetails.cognitive.results.map(
+                            (result, index) => (
+                              <Box
+                                key={`cognitive-${index}`}
+                                p={4}
+                                borderWidth="1px"
+                                borderRadius="md"
+                                shadow="sm"
+                              >
+                                <Flex
+                                  justifyContent="space-between"
+                                  alignItems="center"
+                                  mb={2}
+                                >
+                                  <Heading size="sm">
+                                    {result.CategoryName}
+                                  </Heading>
+                                  <Badge
+                                    colorScheme={getCognitiveScoreColor(
+                                      result.Score
+                                    )}
+                                  >
+                                    Score: {result.Score}
+                                  </Badge>
+                                </Flex>
+                                <Text fontSize="sm" color="gray.600" mb={3}>
+                                  {result.CategoryDescription}
+                                </Text>
+                                <Progress
+                                  value={(result.Score / 12) * 100}
+                                  colorScheme={getCognitiveScoreColor(
+                                    result.Score
+                                  )}
+                                  size="sm"
+                                  borderRadius="full"
+                                />
+                                <Text mt={2} fontSize="sm" textAlign="right">
+                                  {interpretCognitiveScore(result.Score)}
+                                </Text>
+                              </Box>
+                            )
+                          )}
                         </SimpleGrid>
 
-                        <Box mt={6} p={4} borderWidth="1px" borderRadius="md" bg="gray.50">
-                          <Heading size="sm" mb={3}>Cognitive Assessment Interpretation</Heading>
+                        <Box
+                          mt={6}
+                          p={4}
+                          borderWidth="1px"
+                          borderRadius="md"
+                          bg="gray.50"
+                        >
+                          <Heading size="sm" mb={3}>
+                            Cognitive Assessment Interpretation
+                          </Heading>
                           <Text fontSize="sm">
-                            Scores are based on correct answers to questions in each category:
+                            Scores are based on correct answers to questions in
+                            each category:
                           </Text>
                           <SimpleGrid columns={[1, 2, 4]} spacing={4} mt={3}>
                             <Box p={2} bg="green.100" borderRadius="md">
@@ -556,7 +651,9 @@ const AdminDashboard = ({ onLogout, user }) => {
                               <Text fontSize="xs">Basic understanding</Text>
                             </Box>
                             <Box p={2} bg="red.100" borderRadius="md">
-                              <Text fontWeight="bold">0: Needs Development</Text>
+                              <Text fontWeight="bold">
+                                0: Needs Development
+                              </Text>
                               <Text fontSize="xs">Area for improvement</Text>
                             </Box>
                           </SimpleGrid>
@@ -574,9 +671,17 @@ const AdminDashboard = ({ onLogout, user }) => {
                       </TabList>
                       <TabPanels>
                         <TabPanel p={0}>
-                          {!candidateDetails.personality?.results || candidateDetails.personality.results.length === 0 ? (
-                            <Box p={6} textAlign="center" bg="gray.50" borderRadius="md">
-                              <Text>No personality assessment data available</Text>
+                          {!candidateDetails.personality?.results ||
+                          candidateDetails.personality.results.length === 0 ? (
+                            <Box
+                              p={6}
+                              textAlign="center"
+                              bg="gray.50"
+                              borderRadius="md"
+                            >
+                              <Text>
+                                No personality assessment data available
+                              </Text>
                             </Box>
                           ) : (
                             <TableContainer>
@@ -589,26 +694,40 @@ const AdminDashboard = ({ onLogout, user }) => {
                                   </Tr>
                                 </Thead>
                                 <Tbody>
-                                  {candidateDetails.personality.results.map((result, index) => (
-                                    <Tr key={`personality-table-${index}`}>
-                                      <Td>{result.CategoryName}</Td>
-                                      <Td>
-                                        <Badge colorScheme={getScoreColor(result.Score)}>
-                                          {result.Score}
-                                        </Badge>
-                                      </Td>
-                                      <Td>{result.CategoryDescription}</Td>
-                                    </Tr>
-                                  ))}
+                                  {candidateDetails.personality.results.map(
+                                    (result, index) => (
+                                      <Tr key={`personality-table-${index}`}>
+                                        <Td>{result.CategoryName}</Td>
+                                        <Td>
+                                          <Badge
+                                            colorScheme={getScoreColor(
+                                              result.Score
+                                            )}
+                                          >
+                                            {result.Score}
+                                          </Badge>
+                                        </Td>
+                                        <Td>{result.CategoryDescription}</Td>
+                                      </Tr>
+                                    )
+                                  )}
                                 </Tbody>
                               </Table>
                             </TableContainer>
                           )}
                         </TabPanel>
                         <TabPanel p={0}>
-                          {!candidateDetails.cognitive?.results || candidateDetails.cognitive.results.length === 0 ? (
-                            <Box p={6} textAlign="center" bg="gray.50" borderRadius="md">
-                              <Text>No cognitive assessment data available</Text>
+                          {!candidateDetails.cognitive?.results ||
+                          candidateDetails.cognitive.results.length === 0 ? (
+                            <Box
+                              p={6}
+                              textAlign="center"
+                              bg="gray.50"
+                              borderRadius="md"
+                            >
+                              <Text>
+                                No cognitive assessment data available
+                              </Text>
                             </Box>
                           ) : (
                             <TableContainer>
@@ -621,17 +740,23 @@ const AdminDashboard = ({ onLogout, user }) => {
                                   </Tr>
                                 </Thead>
                                 <Tbody>
-                                  {candidateDetails.cognitive.results.map((result, index) => (
-                                    <Tr key={`cognitive-table-${index}`}>
-                                      <Td>{result.CategoryName}</Td>
-                                      <Td>
-                                        <Badge colorScheme={getCognitiveScoreColor(result.Score)}>
-                                          {result.Score}
-                                        </Badge>
-                                      </Td>
-                                      <Td>{result.CategoryDescription}</Td>
-                                    </Tr>
-                                  ))}
+                                  {candidateDetails.cognitive.results.map(
+                                    (result, index) => (
+                                      <Tr key={`cognitive-table-${index}`}>
+                                        <Td>{result.CategoryName}</Td>
+                                        <Td>
+                                          <Badge
+                                            colorScheme={getCognitiveScoreColor(
+                                              result.Score
+                                            )}
+                                          >
+                                            {result.Score}
+                                          </Badge>
+                                        </Td>
+                                        <Td>{result.CategoryDescription}</Td>
+                                      </Tr>
+                                    )
+                                  )}
                                 </Tbody>
                               </Table>
                             </TableContainer>
@@ -645,7 +770,11 @@ const AdminDashboard = ({ onLogout, user }) => {
             )}
           </ModalBody>
           <ModalFooter>
-            <Button colorScheme="blue" mr={3} onClick={() => setIsModalOpen(false)}>
+            <Button
+              colorScheme="blue"
+              mr={3}
+              onClick={() => setIsModalOpen(false)}
+            >
               Close
             </Button>
           </ModalFooter>

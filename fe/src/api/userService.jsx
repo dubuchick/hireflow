@@ -37,7 +37,7 @@ export const login = async (credentials) => {
 };
 
 export const register = (userData) => {
-  return api.post("/register", userData);
+  return api.post("/sign-up", userData);
 };
 
 export const getSelfAssessmentBehavioral = () => {

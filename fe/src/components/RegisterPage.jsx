@@ -16,31 +16,14 @@ import {
   Link,
   useToast,
   HStack,
-  Divider,
 } from "@chakra-ui/react";
-import { Link as RouterLink } from "react-router-dom";
-import { login } from "../api/userService"; // Import the login function
+import { register } from "../api/userService"; // Assuming you'll create a register function
 
-// Add JWT decoder function
-const decodeJWT = (token) => {
-  try {
-    // Get the payload part of the JWT (second part)
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
-      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
-
-    return JSON.parse(jsonPayload);
-  } catch (error) {
-    console.error('Error decoding JWT:', error);
-    return {};
-  }
-};
-
-const LoginPage = ({ onLoginSuccess }) => {
+const RegisterPage = ({ onRegisterSuccess }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [name, setName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -53,8 +36,17 @@ const LoginPage = ({ onLoginSuccess }) => {
 
   const validateForm = () => {
     const newErrors = {};
+    if (!name) newErrors.name = "Name is required";
     if (!email) newErrors.email = "Email is required";
+    else if (!/\S+@\S+\.\S+/.test(email)) newErrors.email = "Email is invalid";
+    
     if (!password) newErrors.password = "Password is required";
+    else if (password.length < 8)
+      newErrors.password = "Password must be at least 8 characters";
+    
+    if (!confirmPassword) newErrors.confirmPassword = "Please confirm your password";
+    else if (password !== confirmPassword)
+      newErrors.confirmPassword = "Passwords do not match";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -67,48 +59,31 @@ const LoginPage = ({ onLoginSuccess }) => {
       setIsLoading(true);
 
       try {
-        // Call the login API
-        const response = await login({ email, password });
-      
-        const token = response.data.token;
-
-        // Store token in localStorage
-        localStorage.setItem("token", token);
-
-        // Decode the JWT to get user info
-        const decodedToken = decodeJWT(token);
-       
-        // Parse role_id as integer
-        const roleId = parseInt(decodedToken.role_id || 2, 10);
-       
-        // Store role_id in localStorage
-        localStorage.setItem("role_id", roleId);
+        // Call the register API
+        const response = await register({
+          email,
+          password,
+          name
+        });
 
         // Show success message
         toast({
-          title: "Login successful",
-          description: "Redirecting to dashboard...",
+          title: "Registration successful",
+          description: "You can now log in with your credentials",
           status: "success",
-          duration: 2000,
+          duration: 3000,
           isClosable: true,
         });
 
-        // Create a complete user object with necessary properties
-        const userData = {
-          id: decodedToken.sub,
-          email: decodedToken.email,
-          role_id: roleId,
-        };
-        
-        // Call the onLoginSuccess function to redirect to dashboard
-        if (onLoginSuccess) {
-          onLoginSuccess(userData);
+        // Call the onRegisterSuccess function if provided
+        if (onRegisterSuccess) {
+          onRegisterSuccess();
         }
       } catch (error) {
-        console.error("Login error:", error);
+        console.error("Registration error:", error);
         toast({
-          title: "Login failed",
-          description: error.response?.data?.message || "Invalid credentials",
+          title: "Registration failed",
+          description: error.response?.data?.message || "Could not create account",
           status: "error",
           duration: 4000,
           isClosable: true,
@@ -129,7 +104,7 @@ const LoginPage = ({ onLoginSuccess }) => {
       bg={useColorModeValue("gray.50", "gray.900")}
     >
       <Box
-        width={["90%", "80%", "60%", "450px"]}
+        width={["90%", "80%", "60%", "500px"]}
         p={8}
         borderRadius="lg"
         bg={bgColor}
@@ -141,12 +116,23 @@ const LoginPage = ({ onLoginSuccess }) => {
               HireFlow
             </Heading>
             <Text fontSize="md" color={textColor}>
-              Sign in to access your assessment portal
+              Create your assessment portal account
             </Text>
           </VStack>
 
           <form onSubmit={handleSubmit}>
             <VStack spacing={4}>
+              <FormControl isInvalid={errors.name}>
+                <FormLabel>Name</FormLabel>
+                <Input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Your Name"
+                />
+                <FormErrorMessage>{errors.name}</FormErrorMessage>
+              </FormControl>
+
               <FormControl isInvalid={errors.email}>
                 <FormLabel>Email</FormLabel>
                 <Input
@@ -181,9 +167,28 @@ const LoginPage = ({ onLoginSuccess }) => {
                 <FormErrorMessage>{errors.password}</FormErrorMessage>
               </FormControl>
 
-              <Link alignSelf="flex-end" fontSize="sm" color="blue.500">
-                Forgot password?
-              </Link>
+              <FormControl isInvalid={errors.confirmPassword}>
+                <FormLabel>Confirm Password</FormLabel>
+                <InputGroup>
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="********"
+                  />
+                  <InputRightElement width="4.5rem">
+                    <Button
+                      h="1.75rem"
+                      size="sm"
+                      onClick={() => setShowPassword(!showPassword)}
+                      variant="ghost"
+                    >
+                      {showPassword ? "Hide" : "Show"}
+                    </Button>
+                  </InputRightElement>
+                </InputGroup>
+                <FormErrorMessage>{errors.confirmPassword}</FormErrorMessage>
+              </FormControl>
 
               <Button
                 w="100%"
@@ -192,24 +197,15 @@ const LoginPage = ({ onLoginSuccess }) => {
                 type="submit"
                 mt={2}
               >
-                Sign In
-              </Button>
-              
-              <Divider my={2} />
-
-              <Text textAlign="center" fontSize="sm">
-                Don't have an account?
-              </Text>
-
-              <Button
-                as={RouterLink}
-                to="/register"
-                w="100%"
-                colorScheme="gray"
-                variant="outline"
-              >
                 Create Account
               </Button>
+              
+              <Text fontSize="sm" textAlign="center">
+                Already have an account?{" "}
+                <Link color="blue.500" href="/login">
+                  Sign in
+                </Link>
+              </Text>
             </VStack>
           </form>
         </VStack>
@@ -218,4 +214,4 @@ const LoginPage = ({ onLoginSuccess }) => {
   );
 };
 
-export default LoginPage;
+export default RegisterPage;

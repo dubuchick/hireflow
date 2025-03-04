@@ -13,6 +13,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import LoginPage from "./components/LoginPage";
+import RegisterPage from "./components/RegisterPage"; // Import the RegisterPage component
 import Dashboard from "./components/Dashboard";
 import AdminDashboard from "./components/AdminDashboard";
 import BehavioralAssessment from "./components/BehavioralAssessment";
@@ -90,6 +91,12 @@ const App = () => {
     setUser({ ...userData, isLoggedIn: true });
   };
 
+  // Handle successful registration
+  const handleRegisterSuccess = () => {
+    // Navigate to login page after successful registration
+    return <Navigate to="/login" replace />;
+  };
+
   // Handle logout
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -123,6 +130,17 @@ const App = () => {
                 <Navigate to="/dashboard" replace />
               ) : (
                 <LoginPage onLoginSuccess={handleLoginSuccess} />
+              )
+            }
+          />
+          {/* Add the register route */}
+          <Route
+            path="/register"
+            element={
+              user?.isLoggedIn ? (
+                <Navigate to="/dashboard" replace />
+              ) : (
+                <RegisterPage onRegisterSuccess={handleRegisterSuccess} />
               )
             }
           />

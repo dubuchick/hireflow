@@ -27,7 +27,6 @@ import {
 
 // Placeholder icons (you can replace with actual icons from a library like react-icons)
 const MenuIcon = () => <span>☰</span>;
-const BellIcon = () => <span>🔔</span>;
 const UserIcon = () => <span>👤</span>;
 export const Header = ({ onLogout, user }) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -65,13 +64,6 @@ export const Header = ({ onLogout, user }) => {
         </HStack>
 
         <Flex alignItems="center">
-          <IconButton
-            size="md"
-            icon={<BellIcon />}
-            aria-label="Notifications"
-            variant="ghost"
-            mr={3}
-          />
           <Menu>
             <MenuButton
               as={Button}

@@ -1,4 +1,4 @@
-DB_DSN="postgresql://postgres:yourpassword@localhost:5432/postgres?sslmode=disable"
+DB_DSN="postgresql://postgres:yourpassword@localhost:5433/postgres?sslmode=disable"
 MIGRATIONS_PATH=./migrations
 
 migrate-up:
