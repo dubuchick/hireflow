@@ -15,7 +15,6 @@ func SetupRoutesSelfAssessment(r *gin.Engine, selfAssessmentHandler *SelfAssessm
 	auth.GET("/question/personality", selfAssessmentHandler.GetSelfAssessmentPersonality)
 	auth.GET("/question/cognitive", selfAssessmentHandler.GetSelfAssessmentCognitive)
 	auth.GET("/status", selfAssessmentHandler.GetUserAssessmentStatus)
-	auth.PUT("/mapping", selfAssessmentHandler.SetupBehavioralCategoriesAndMappings)
 	auth.GET("/candidate/scores", selfAssessmentHandler.GetCandidateScores)
 
 	// Add new unified route
