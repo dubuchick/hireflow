@@ -19,12 +19,11 @@ import {
   Divider,
 } from "@chakra-ui/react";
 import { Link as RouterLink } from "react-router-dom";
-import { login } from "../api/userService"; // Import the login function
+import { login } from "../api/userService";
 
 // Add JWT decoder function
 const decodeJWT = (token) => {
   try {
-    // Get the payload part of the JWT (second part)
     const base64Url = token.split('.')[1];
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
     const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
@@ -45,7 +44,6 @@ const LoginPage = ({ onLoginSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // Add toast for notifications
   const toast = useToast();
 
   const bgColor = useColorModeValue("white", "gray.800");
@@ -72,19 +70,14 @@ const LoginPage = ({ onLoginSuccess }) => {
       
         const token = response.data.token;
 
-        // Store token in localStorage
         localStorage.setItem("token", token);
 
-        // Decode the JWT to get user info
         const decodedToken = decodeJWT(token);
        
-        // Parse role_id as integer
         const roleId = parseInt(decodedToken.role_id || 2, 10);
        
-        // Store role_id in localStorage
         localStorage.setItem("role_id", roleId);
 
-        // Show success message
         toast({
           title: "Login successful",
           description: "Redirecting to dashboard...",
@@ -93,14 +86,12 @@ const LoginPage = ({ onLoginSuccess }) => {
           isClosable: true,
         });
 
-        // Create a complete user object with necessary properties
         const userData = {
           id: decodedToken.sub,
           email: decodedToken.email,
           role_id: roleId,
         };
         
-        // Call the onLoginSuccess function to redirect to dashboard
         if (onLoginSuccess) {
           onLoginSuccess(userData);
         }

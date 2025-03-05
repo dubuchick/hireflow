@@ -67,7 +67,6 @@ func (h *AuthHandler) Signup(c *gin.Context) {
 		return
 	}
 
-	// Check if user exists
 	_, err := h.queries.GetUserByEmail(context.Background(), req.Email)
 	if err == nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "email already registered"})
@@ -84,7 +83,6 @@ func (h *AuthHandler) Signup(c *gin.Context) {
 		req.RoleID = 2
 	}
 
-	// Adjust the CreateUser parameters based on your SQLC query
 	user, err := h.queries.CreateUser(context.Background(), CreateUserParams{
 		Email:    req.Email,
 		Password: string(hashedPassword),
@@ -97,9 +95,9 @@ func (h *AuthHandler) Signup(c *gin.Context) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub":     strconv.Itoa(int(user.ID)), // Subject (User ID)
+		"sub":     strconv.Itoa(int(user.ID)), 
 		"email":   user.Email,
-		"role_id": user.RoleID.Int32, // Add role_id to token
+		"role_id": user.RoleID.Int32, 
 		"iat":     time.Now().Unix(),
 		"exp":     time.Now().Add(24 * time.Hour).Unix(),
 	})

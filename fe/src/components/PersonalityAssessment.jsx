@@ -102,7 +102,6 @@ const PersonalityAssessment = ({ onLogout, user, onComplete }) => {
     setIsSubmitting(true);
 
     try {
-      // Format answers for API
       const formattedAnswers = Object.entries(answers).map(
         ([questionId, value]) => ({
           question_id: parseInt(questionId),
@@ -110,7 +109,6 @@ const PersonalityAssessment = ({ onLogout, user, onComplete }) => {
         })
       );
 
-      // Make sure auth is set up before submitting
       setupAuthHeadersFromStorage();
 
       const response = await submitPersonalityAssessment(formattedAnswers);
@@ -123,16 +121,14 @@ const PersonalityAssessment = ({ onLogout, user, onComplete }) => {
         isClosable: true,
       });
 
-      // Call onComplete if provided (for any additional logic)
       if (onComplete) {
         onComplete("personality", response.data.session_id);
       }
 
-      // Set a short delay before redirecting to provide user feedback
       setTimeout(() => {
         // Redirect to dashboard
         navigate("/dashboard");
-      }, 1500); // 1.5 second delay to show the success message
+      }, 1500); 
     } catch (error) {
       console.error("Error submitting answers:", error);
       toast({

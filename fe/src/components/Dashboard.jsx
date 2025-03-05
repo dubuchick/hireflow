@@ -22,10 +22,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import {
   getAssessmentStatus,
-  setupAuthHeadersFromStorage,
-} from "../api/userService"; // Make sure to install react-router if you haven't
+} from "../api/userService"; 
 
-// Placeholder icons (you can replace with actual icons from a library like react-icons)
 const MenuIcon = () => <span>☰</span>;
 const UserIcon = () => <span>👤</span>;
 export const Header = ({ onLogout, user }) => {
@@ -127,21 +125,18 @@ const Dashboard = ({ onLogout, user }) => {
 
   const toast = useToast();
   const navigate = useNavigate();
-// Clean version without unnecessary logging
 useEffect(() => {
     const fetchAssessmentStatus = async () => {
       try {
         // Get raw API response
         const response = await getAssessmentStatus();
         
-        // Update assessments based on what we can find
         if (response) {
           setAssessments((prev) =>
             prev.map((assessment) => {
               const type = assessment.type.toLowerCase();
               let isCompleted = false;
               
-              // Try all possible paths to find the completed status
               if (response.assessments_completed && 
                   response.assessments_completed[type] === true) {
                 isCompleted = true;
@@ -187,17 +182,6 @@ useEffect(() => {
     });
 
     navigate(`/assessment/${type}`);
-  };
-
-  // This function is left for potential future use
-  const updateAssessmentStatus = (type, newStatus) => {
-    setAssessments(
-      assessments.map((assessment) =>
-        assessment.type.toLowerCase() === type.toLowerCase()
-          ? { ...assessment, status: newStatus }
-          : assessment
-      )
-    );
   };
 
   return (

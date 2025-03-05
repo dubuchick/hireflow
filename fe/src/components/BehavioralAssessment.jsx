@@ -13,14 +13,14 @@ import {
   Stack,
   Divider,
 } from "@chakra-ui/react";
-import { MainLayout } from "./Dashboard"; // Assuming MainLayout is exported from Dashboard
+import { MainLayout } from "./Dashboard"; 
 import {
   getSelfAssessmentBehavioral,
   submitBehavioralAssessment,
   setupAuthHeadersFromStorage,
 } from "../api/userService";
 import { useNavigate } from "react-router-dom";
-import base64 from "base-64"; // Import Base64 decoder
+import base64 from "base-64"; 
 
 const BehavioralAssessment = ({ onLogout, user, onComplete }) => {
   const [questions, setQuestions] = useState([]);
@@ -102,7 +102,6 @@ const BehavioralAssessment = ({ onLogout, user, onComplete }) => {
     setIsSubmitting(true);
 
     try {
-      // Format answers for API
       const formattedAnswers = Object.entries(answers).map(
         ([questionId, value]) => ({
           question_id: parseInt(questionId),
@@ -110,7 +109,6 @@ const BehavioralAssessment = ({ onLogout, user, onComplete }) => {
         })
       );
 
-      // Make sure auth is set up before submitting
       setupAuthHeadersFromStorage();
 
       const response = await submitBehavioralAssessment(formattedAnswers);
@@ -123,16 +121,13 @@ const BehavioralAssessment = ({ onLogout, user, onComplete }) => {
         isClosable: true,
       });
 
-      // Call onComplete if provided (for any additional logic)
       if (onComplete) {
         onComplete("behavioral", response.data.session_id);
       }
 
-      // Set a short delay before redirecting to provide user feedback
       setTimeout(() => {
-        // Redirect to dashboard
         navigate("/dashboard");
-      }, 1500); // 1.5 second delay to show the success message
+      }, 1500);
     } catch (error) {
       console.error("Error submitting answers:", error);
       toast({

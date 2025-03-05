@@ -17,7 +17,7 @@ import {
   useToast,
   HStack,
 } from "@chakra-ui/react";
-import { register } from "../api/userService"; // Assuming you'll create a register function
+import { register } from "../api/userService"; 
 
 const RegisterPage = ({ onRegisterSuccess }) => {
   const [email, setEmail] = useState("");
@@ -28,7 +28,7 @@ const RegisterPage = ({ onRegisterSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // Add toast for notifications
+  //for notifications
   const toast = useToast();
 
   const bgColor = useColorModeValue("white", "gray.800");
@@ -59,14 +59,12 @@ const RegisterPage = ({ onRegisterSuccess }) => {
       setIsLoading(true);
 
       try {
-        // Call the register API
         const response = await register({
           email,
           password,
           name
         });
 
-        // Show success message
         toast({
           title: "Registration successful",
           description: "You can now log in with your credentials",
@@ -75,7 +73,6 @@ const RegisterPage = ({ onRegisterSuccess }) => {
           isClosable: true,
         });
 
-        // Call the onRegisterSuccess function if provided
         if (onRegisterSuccess) {
           onRegisterSuccess();
         }

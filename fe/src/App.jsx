@@ -13,22 +13,20 @@ import {
   Navigate,
 } from "react-router-dom";
 import LoginPage from "./components/LoginPage";
-import RegisterPage from "./components/RegisterPage"; // Import the RegisterPage component
+import RegisterPage from "./components/RegisterPage"; 
 import Dashboard from "./components/Dashboard";
 import AdminDashboard from "./components/AdminDashboard";
 import BehavioralAssessment from "./components/BehavioralAssessment";
 import PersonalityAssessment from "./components/PersonalityAssessment";
 import CognitiveAssessment from "./components/CognitiveAssessment";
-// Import other assessment types as needed
 
-// Theme configuration
 const theme = extendTheme({
   colors: {
     brand: {
       50: "#e6f2ff",
       100: "#b3d9ff",
-      500: "#0066cc", // primary blue
-      600: "#0052a3", // darker blue for hover states
+      500: "#0066cc",
+      600: "#0052a3", 
     },
   },
   fonts: {
@@ -51,13 +49,11 @@ const theme = extendTheme({
   },
 });
 
-// Route guard component
 const ProtectedRoute = ({ user, children, requiredRole }) => {
   if (!user?.isLoggedIn) {
     return <Navigate to="/login" replace />;
   }
 
-  // If a requiredRole is specified, check against user's role
   if (requiredRole && user.role_id !== requiredRole) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -69,7 +65,6 @@ const App = () => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check for existing authentication on component mount
   useEffect(() => {
     const checkAuth = () => {
       const token = localStorage.getItem("token");
@@ -85,15 +80,14 @@ const App = () => {
     checkAuth();
   }, []);
 
-  // Handle successful login
+  // Handle login
   const handleLoginSuccess = (userData) => {
     localStorage.setItem("role_id", userData.role_id);
     setUser({ ...userData, isLoggedIn: true });
   };
 
-  // Handle successful registration
+  // Handle registration
   const handleRegisterSuccess = () => {
-    // Navigate to login page after successful registration
     return <Navigate to="/login" replace />;
   };
 
@@ -109,7 +103,6 @@ const App = () => {
     console.log(`${type} assessment completed`);
   };
 
-  // Show loading spinner while checking authentication
   if (isLoading) {
     return (
       <Flex height="100vh" width="100%" align="center" justify="center">
@@ -133,7 +126,6 @@ const App = () => {
               )
             }
           />
-          {/* Add the register route */}
           <Route
             path="/register"
             element={
@@ -192,7 +184,6 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-          {/* Add routes for other assessment types as needed */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Router>

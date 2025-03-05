@@ -38,14 +38,12 @@ const CognitiveAssessment = ({ onLogout, user, onComplete }) => {
   const toast = useToast();
   const navigate = useNavigate();
 
-  // Format time for display (MM:SS format)
   const formatTime = (seconds) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
   };
 
-  // Load questions on component mount
   useEffect(() => {
     setupAuthHeadersFromStorage();
     const fetchCognitiveQuestions = async () => {
@@ -61,7 +59,6 @@ const CognitiveAssessment = ({ onLogout, user, onComplete }) => {
 
         setQuestions(formattedQuestions);
 
-        // Initialize answers state with empty values
         const initialAnswers = {};
         formattedQuestions.forEach((q) => {
           initialAnswers[q.id] = "";
@@ -114,7 +111,6 @@ const CognitiveAssessment = ({ onLogout, user, onComplete }) => {
     handleSubmit();
   };
 
-  // Handle answer selection
   const handleAnswer = (value) => {
     setAnswers({
       ...answers,
@@ -122,34 +118,29 @@ const CognitiveAssessment = ({ onLogout, user, onComplete }) => {
     });
   };
 
-  // Navigate to next question
   const handleNext = () => {
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
     }
   };
 
-  // Navigate to previous question
   const handlePrevious = () => {
     if (currentQuestion > 0) {
       setCurrentQuestion(currentQuestion - 1);
     }
   };
 
-  // Submit all answers
   const handleSubmit = async () => {
     setIsSubmitting(true);
 
     try {
-      // Format answers for API - convert answer values to integers
       const formattedAnswers = Object.entries(answers)
-        .filter(([_, value]) => value !== "") // Only include answered questions
+        .filter(([_, value]) => value !== "") 
         .map(([questionId, value]) => ({
           question_id: parseInt(questionId),
-          answer_value: value, // Will be converted to integer on the backend
+          answer_value: value,
         }));
 
-      // Make sure auth is set up before submitting
       setupAuthHeadersFromStorage();
 
       const response = await submitCognitiveAssessment(formattedAnswers);
@@ -162,7 +153,6 @@ const CognitiveAssessment = ({ onLogout, user, onComplete }) => {
         isClosable: true,
       });
 
-      // Call onComplete if provided (for any additional logic)
       if (onComplete) {
         onComplete("cognitive", response.data.session_id);
       }
