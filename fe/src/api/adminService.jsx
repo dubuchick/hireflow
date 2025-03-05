@@ -9,7 +9,6 @@ export const getCandidateScores = async () => {
   }
 };
 
-// New function to get detailed assessment results
 export const getCandidateDetails = async (params) => {
   try {
     const response = await api.post('/self-assessment/candidate/details', params);
