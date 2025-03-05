@@ -17,8 +17,10 @@ DB_DSN="postgresql://<username>:<password>@<host>:<port>/<database>?sslmode=disa
     "name":"admin"
     }
 
-4. Register an account on this url http://localhost:5173/register
+4. Run the command " go run main.go " and also cd to a folder called fe, and run "npm run dev"
 
-5. Login and do the behavioral, cognitive, and personality test.
+5. Register an account on this url http://localhost:5173/register
 
-6. If you want to look at the candidate results, then just login as an admin.
+6. Login and do the behavioral, cognitive, and personality test.
+
+7. If you want to look at the candidate results, then just login as an admin.
