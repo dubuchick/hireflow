@@ -69,46 +69,48 @@ WHERE user_id = $1 AND completed_at IS NOT NULL;
 
 -- name: ListCandidateScores :many
 WITH user_category_scores AS (
-  SELECT 
-    user_id,
-    session_id,
-    category_id,
-    score,
-    sac.name AS category_name
-  FROM 
-    user_assessment_scores uas
-  JOIN 
-    self_assessment_categories sac ON uas.category_id = sac.id
+SELECT
+ uas.user_id,
+ uas.session_id,
+ uas.category_id,
+ uas.score,
+ sac.name AS category_name
+FROM
+ user_assessment_scores uas
+JOIN
+ self_assessment_categories sac ON uas.category_id = sac.id
+JOIN
+ user_assessment_sessions sessions ON uas.session_id = sessions.id
+WHERE
+ sessions.assessment_type = 'behavioral'
 ),
 candidate_behavioral_scores AS (
-  SELECT 
-    user_id,
-    session_id,
-    category_id,
-    category_name,
-    score,
-    RANK() OVER (PARTITION BY user_id ORDER BY score DESC) as score_rank
-  FROM 
-    user_category_scores
+SELECT
+ user_id,
+ session_id,
+ category_id,
+ category_name,
+ score,
+ RANK() OVER (PARTITION BY user_id ORDER BY score DESC) as score_rank
+FROM
+ user_category_scores
 )
-
-SELECT 
-  user_id,
-  session_id,
-  category_name AS top_behavioral_trait,
-  score AS top_behavioral_score,
-  CASE 
-    WHEN COUNT(category_name) OVER (PARTITION BY user_id) > 0 
-    THEN 'In Progress'
-    ELSE 'Not Started'
-  END AS assessment_status
-FROM 
-  candidate_behavioral_scores
-WHERE 
-  score_rank = 1
-ORDER BY 
-  user_id;
-
+SELECT
+ user_id,
+ session_id,
+ category_name AS top_behavioral_trait,
+ score AS top_behavioral_score,
+CASE
+WHEN COUNT(category_name) OVER (PARTITION BY user_id) > 0
+THEN 'In Progress'
+ ELSE 'Not Started'
+END AS assessment_status
+FROM
+ candidate_behavioral_scores
+WHERE
+ score_rank = 1
+ORDER BY
+ user_id;
 
 -- name: CompleteAssessmentSession :exec
 -- Mark a session as completed

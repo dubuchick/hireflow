@@ -17,12 +17,9 @@ func SetupRoutesSelfAssessment(r *gin.Engine, selfAssessmentHandler *SelfAssessm
 	auth.GET("/status", selfAssessmentHandler.GetUserAssessmentStatus)
 	auth.GET("/candidate/scores", selfAssessmentHandler.GetCandidateScores)
 
-	// Add new unified route
+	// Submit Assessment
 	auth.POST("/submit/:type", selfAssessmentHandler.SubmitAssessment)
 
-	// Add route to get session scores
-	auth.POST("/session/scores", selfAssessmentHandler.GetSessionScores)
-
-	// Add the new route for candidate assessment details
+	// Candidate Details
 	auth.POST("/candidate/details", selfAssessmentHandler.GetCandidateAssessmentDetails)
 }

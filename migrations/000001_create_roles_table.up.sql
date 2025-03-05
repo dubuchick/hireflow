@@ -4,6 +4,6 @@ CREATE TABLE IF NOT EXISTS roles(
     created_at timestamp default now()
 );
 
-INSERT INTO public.roles ("name", created_at) VALUES
+INSERT INTO roles ("name", created_at) VALUES
 ('admin', now()),
 ('candidate', now());
